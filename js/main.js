@@ -118,6 +118,41 @@ function boot(renderer) {
   window.addEventListener('orientationchange', () => setTimeout(resize, 250));
   resize();
 
+  // ---- ピンチ拡大への追従 ----
+  // iOS Safari は user-scalable=no を無視するので拡大自体は防げない。
+  // 拡大されると HUD やボタンが画面の外へ出て「メーターが欠けた」状態になるため、
+  // UI レイヤだけを実際に見えている範囲（visual viewport）へ合わせ直す。
+  const vv = window.visualViewport;
+  const vpLayers = ['ui', 'warn', 'title', 'pause', 'result', 'fatal']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+
+  function syncViewportLayers() {
+    if (!vv) return;
+    const scale = vv.scale || 1;
+    // 等倍のときは素の inset: 0 に任せる（transform を残すと描画が甘くなる）
+    const plain = scale < 1.01 && Math.abs(vv.offsetLeft) < 0.5 && Math.abs(vv.offsetTop) < 0.5;
+    for (const el of vpLayers) {
+      if (plain) {
+        el.style.width = '';
+        el.style.height = '';
+        el.style.transform = '';
+        continue;
+      }
+      // 見えている矩形にレイヤを重ね、拡大率を打ち消して元の大きさで表示する
+      el.style.width = `${vv.width * scale}px`;
+      el.style.height = `${vv.height * scale}px`;
+      el.style.transform =
+        `translate(${vv.offsetLeft}px, ${vv.offsetTop}px) scale(${1 / scale})`;
+    }
+  }
+  if (vv) {
+    vv.addEventListener('resize', syncViewportLayers);
+    vv.addEventListener('scroll', syncViewportLayers);
+    window.addEventListener('orientationchange', () => setTimeout(syncViewportLayers, 260));
+    syncViewportLayers();
+  }
+
   // ---- UI 配線 ----
   const appEl = document.getElementById('app');
   const titleEl = document.getElementById('title');
