@@ -133,16 +133,21 @@ export class Game {
     // --- 移動 ---
     const mv = input.move;
     this._move.set(0, 0, 0);
+    let inputMag = 0;
     if (Math.abs(mv.x) > 0.001 || Math.abs(mv.y) > 0.001) {
       const s = Math.sin(this.camYaw), c = Math.cos(this.camYaw);
       // カメラ前方 = (-s, 0, -c)、右 = (c, 0, -s)
       this._move.x = -s * mv.y + c * mv.x;
       this._move.z = -c * mv.y - s * mv.x;
       const len = Math.hypot(this._move.x, this._move.z);
-      if (len > 1) { this._move.x /= len; this._move.z /= len; }
+      if (len > 0.001) {
+        inputMag = Math.min(1, len);
+        // 方向と入力強度を分離し、アナログ入力を二重に掛けない
+        this._move.x /= len;
+        this._move.z /= len;
+      }
     }
     const speed = CONFIG.speed[this.player.pose] ?? CONFIG.speed.stand;
-    const inputMag = Math.hypot(this._move.x, this._move.z);
     this.player.update(dt, this._move, speed * inputMag);
     resolveCollisions(this.player.position, this.player.radius, this.stage.solids);
 
@@ -160,7 +165,7 @@ export class Game {
     sense.pz = this.player.position.z;
 
     // --- 擬態成功度 ---
-    this.updateBackdropColor(sense);
+    this.updateBackdropColor();
     this.mimicry = this.computeMimicry();
 
     // --- 警戒度 ---
@@ -271,16 +276,18 @@ export class Game {
    * 鬼から見てプレイヤーの「背景」になっている物の色を調べる。
    * これが擬態成功度の色判定に使われる（＝立ち位置が重要）。
    */
-  updateBackdropColor(sense) {
+  updateBackdropColor() {
     const p = this.player.position;
     const eye = this.oni.position;
     let dx = p.x - eye.x, dz = p.z - eye.z;
     const len = Math.hypot(dx, dz);
     if (len < 0.2) { this.backdropColor.copy(this.defaultBackdrop); return; }
     dx /= len; dz /= len;
-    // プレイヤーの胸の高さから、鬼→プレイヤーの延長線上を水平に飛ばす
+    // プレイヤーの胸の高さから、鬼→プレイヤーの延長線上を水平に飛ばす。
+    // 大きく後方へずらすと、密着中の家具・壁の内部からレイが始まり
+    // 表面を拾えなくなるため、ごく小さいオフセットだけを与える。
     const h = 1.05 * this.player.body.scale.y;
-    this._orig.set(p.x + dx * 0.45, h, p.z + dz * 0.45);
+    this._orig.set(p.x + dx * 0.04, h, p.z + dz * 0.04);
     this._dir2.set(dx, 0, dz);
     this._ray.set(this._orig, this._dir2);
     this._ray.near = 0;

@@ -89,6 +89,13 @@ function bindTap(el, fn) {
     el.classList.add('active');
     fn();
   });
+  // Enter・Space・支援技術による通常の button click にも対応する。
+  // ポインター由来の click は pointerdown で処理済みなので重複させない。
+  el.addEventListener('click', (e) => {
+    if (e.detail !== 0) return;
+    e.preventDefault();
+    fn();
+  });
   const clear = () => el.classList.remove('active');
   el.addEventListener('pointerup', clear);
   el.addEventListener('pointercancel', clear);

@@ -13,6 +13,9 @@ export const VIEW = {
 
 export const STATE = { PATROL: 'patrol', LOOK: 'look', SUSPECT: 'suspect', FOUND: 'found' };
 
+const ONI_RADIUS = 0.42;
+const PATH_CLEARANCE = ONI_RADIUS;
+
 export class Oni {
   constructor(scene, stage) {
     this.stage = stage;
@@ -125,14 +128,43 @@ export class Oni {
 
   pickWaypoint() {
     const wps = this.stage.waypoints;
-    let idx = this.wpIndex;
-    for (let i = 0; i < 8; i++) {
-      const cand = Math.floor(Math.random() * wps.length);
-      if (cand !== this.wpIndex && wps[cand].distanceTo(this.root.position) > 2.5) { idx = cand; break; }
+    const candidates = [];
+    for (let i = 0; i < wps.length; i++) {
+      const dist = wps[i].distanceTo(this.root.position);
+      if (i !== this.wpIndex && dist > 1.2 && this.canWalkDirectly(wps[i])) candidates.push(i);
     }
+    // 追跡後など、直前の目的地しか見通せない位置ではそれも候補に戻す
+    if (candidates.length === 0) {
+      for (let i = 0; i < wps.length; i++) {
+        if (wps[i].distanceTo(this.root.position) > 0.4 && this.canWalkDirectly(wps[i])) candidates.push(i);
+      }
+    }
+    const idx = candidates.length > 0
+      ? candidates[Math.floor(Math.random() * candidates.length)]
+      : this.wpIndex;
     this.wpIndex = idx;
     this.target.copy(wps[idx]);
     this.stuckTimer = 0;
+  }
+
+  /** 家具を避けて目的地まで直進できるかを軽量に調べる */
+  canWalkDirectly(target) {
+    const p = this.root.position;
+    const dx = target.x - p.x, dz = target.z - p.z;
+    const dist = Math.hypot(dx, dz);
+    const steps = Math.max(1, Math.ceil(dist / 0.18));
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      const x = p.x + dx * t;
+      const z = p.z + dz * t;
+      for (const s of this.stage.solids) {
+        if (
+          x > s.minX - PATH_CLEARANCE && x < s.maxX + PATH_CLEARANCE &&
+          z > s.minZ - PATH_CLEARANCE && z < s.maxZ + PATH_CLEARANCE
+        ) return false;
+      }
+    }
+    return true;
   }
 
   /** 現在の視線方向（首振りを含む） */
@@ -266,7 +298,7 @@ export class Oni {
     const before = { x: p.x, z: p.z };
     p.x += nx * step;
     p.z += nz * step;
-    resolveCollisions(p, 0.42, this.stage.solids);
+    resolveCollisions(p, ONI_RADIUS, this.stage.solids);
     const moved = Math.hypot(p.x - before.x, p.z - before.z);
     this.speed = moved / Math.max(dt, 0.0001);
     // 進行方向を向く

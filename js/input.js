@@ -24,24 +24,24 @@ export class Input {
 
   setEnabled(v) {
     this.enabled = v;
-    if (!v) {
-      this.keys.clear();
-      this.mimicCount = 0;
-      this.poseCount = 0;
-      this.stick.x = 0; this.stick.y = 0;
-      this._stickPointer = null;
-      this._lookPointer = null;
-      this.resetKnob();
-    }
+    // タイトル・リザルト中に入った入力を次のゲームへ持ち越さない
+    this.keys.clear();
+    this.lookDX = 0; this.lookDY = 0;
+    this.mimicCount = 0;
+    this.poseCount = 0;
+    this.stick.x = 0; this.stick.y = 0;
+    this._stickPointer = null;
+    this._lookPointer = null;
+    this.resetKnob();
   }
 
   bindKeyboard() {
     const block = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
     window.addEventListener('keydown', (e) => {
+      if (!this.enabled) return;
       if (block.has(e.code)) e.preventDefault();
       if (e.repeat) return;
       this.keys.add(e.code);
-      if (!this.enabled) return;
       if (e.code === 'KeyE' || e.code === 'Enter') this.mimicCount++;
       if (e.code === 'KeyQ' || e.code === 'Space' || e.code === 'ShiftLeft') this.poseCount++;
     });
@@ -51,7 +51,7 @@ export class Input {
 
   bindLook() {
     const down = (e) => {
-      if (this._lookPointer !== null) return;
+      if (!this.enabled || this._lookPointer !== null) return;
       this._lookPointer = e.pointerId;
       this._lastLook.x = e.clientX;
       this._lastLook.y = e.clientY;
@@ -94,6 +94,7 @@ export class Input {
       if (this.knobEl) this.knobEl.style.transform = `translate(${dx}px, ${dy}px)`;
     };
     el.addEventListener('pointerdown', (e) => {
+      if (!this.enabled) return;
       e.preventDefault();
       e.stopPropagation();
       this._stickPointer = e.pointerId;
@@ -125,6 +126,7 @@ export class Input {
 
   /** {x: 右, y: 前} を -1..1 で返す */
   get move() {
+    if (!this.enabled) return { x: 0, y: 0 };
     let x = this.stick.x;
     let y = this.stick.y;
     if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) y += 1;
