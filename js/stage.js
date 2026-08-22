@@ -334,7 +334,7 @@ function buildClassroom(scene) {
     occluders,
     solids,
     targets,
-    playerSpawn: new THREE.Vector3(-6.15, 0, 5.05),
+    playerSpawn: new THREE.Vector3(-2.2, 0, 4.9),
     oniSpawn: new THREE.Vector3(5.8, 0, -4.4),
     // 机の間の通路だけを巡回候補にし、列の読み合いを作る。
     waypoints: [
