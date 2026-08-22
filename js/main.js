@@ -8,8 +8,9 @@ import { initAudio, setMuted, isMuted } from './audio.js';
 const MUTE_KEY = 'ningenkagu.muted';
 const STAGE_KEY = 'ningenkagu.stageIndex';
 const STAGES = [
-  { id: 'living', label: 'STAGE 1　リビング', name: 'リビング' },
-  { id: 'classroom', label: 'STAGE 2　教室', name: '教室' },
+  { id: 'living', label: 'STAGE 1　リビング', name: 'リビング', clearNote: 'リビング突破！ 次は机とロッカーだらけの教室。鬼の巡回路も変わる。' },
+  { id: 'classroom', label: 'STAGE 2　教室', name: '教室', clearNote: '教室突破！ 次は石膏像とイーゼルが並ぶ美術室。真っ白な像に紛れ込め。' },
+  { id: 'artroom', label: 'STAGE 3　美術室', name: '美術室', clearNote: '' },
 ];
 
 /** 前回クリアまで進んだステージから再開できるようにする */
@@ -269,7 +270,7 @@ function boot(renderer) {
     input.setEnabled(true);
   }
 
-  /** リビング勝利時だけ次の教室へ進み、それ以外は現在の面をリトライする。 */
+  /** 勝利かつ次のステージがあるときだけ進み、それ以外は現在の面をリトライする。 */
   function startFromCurrentScreen() {
     if (game.state === 'win' && stageIndex < STAGES.length - 1) {
       loadStage(stageIndex + 1);
@@ -326,10 +327,10 @@ function boot(renderer) {
       if (btnRetry) {
         btnRetry.textContent = hasNext
           ? '次のステージへ'
-          : (stageIndex === STAGES.length - 1 && game.state === 'win' ? '教室をもう一度' : 'もう一度遊ぶ');
+          : (stageIndex === STAGES.length - 1 && game.state === 'win' ? STAGES[stageIndex].name + 'をもう一度' : 'もう一度遊ぶ');
       }
       if (hasNext && resultNote) {
-        resultNote.textContent = 'リビング突破！ 次は机とロッカーだらけの教室。鬼の巡回路も変わる。';
+        resultNote.textContent = STAGES[stageIndex].clearNote;
       }
     }
   };
