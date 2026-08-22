@@ -338,15 +338,18 @@ function buildClassroom(scene) {
     oniSpawn: new THREE.Vector3(5.8, 0, -4.4),
     // 机の間の通路だけを巡回候補にし、列の読み合いを作る。
     waypoints: [
-      new THREE.Vector3(2.15, 0, -4.2),
-      new THREE.Vector3(5.85, 0, -2.2),
-      new THREE.Vector3(2.2, 0, -0.8),
-      new THREE.Vector3(2.2, 0, 2.0),
-      new THREE.Vector3(5.75, 0, 4.65),
-      new THREE.Vector3(-2.2, 0, 4.7),
+      new THREE.Vector3(2.2, 0, -4.2),
+      new THREE.Vector3(5.8, 0, -2.2),
+      new THREE.Vector3(2.2, 0, -3.2),
+      new THREE.Vector3(-2.2, 0, -3.2),
+      new THREE.Vector3(-5.7, 0, -3.2),
+      new THREE.Vector3(-2.2, 0, -0.5),
       new THREE.Vector3(-2.2, 0, 2.0),
-      new THREE.Vector3(-2.2, 0, -0.8),
-      new THREE.Vector3(-5.7, 0, -4.5),
+      new THREE.Vector3(-2.2, 0, 4.9),
+      new THREE.Vector3(2.2, 0, 4.9),
+      new THREE.Vector3(2.2, 0, 2.0),
+      new THREE.Vector3(2.2, 0, -0.5),
+      new THREE.Vector3(5.75, 0, 4.65),
     ],
   };
 }
