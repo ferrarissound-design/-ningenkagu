@@ -5,6 +5,8 @@
   --found: #ef4444;
   --ink: #f2f5f8;
   --panel: rgba(16, 18, 24, 0.82);
+  --neon: #3dff6e;
+  --tglass: rgba(8, 12, 10, 0.74);
 }
 
 * { box-sizing: border-box; }
@@ -26,6 +28,49 @@ html, body {
 
 #app { position: fixed; inset: 0; }
 #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+/* ---------------- タイトルの背景演出 ---------------- */
+/* canvas の兄弟として同じ重ね合わせ文脈に置き、3D画面そのものを色かぶせする。
+   擬態＝色を写す、というゲームの題材に合わせたサーモグラフィ風の見た目。 */
+#app.titlemode #scene { filter: contrast(1.3) saturate(1.3) brightness(1.04); }
+
+#tlFx {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .5s ease;
+}
+#app.titlemode #tlFx { opacity: 1; }
+#tlFx i { position: absolute; inset: 0; display: block; }
+
+/* color ブレンドは明暗だけを残して色を総取り換えするので、
+   グレーの柱や白い壁まで発色し、サーモグラフィのような画になる */
+#tlFx .hue {
+  mix-blend-mode: color;
+  opacity: .93;
+  background: linear-gradient(115deg,
+    #ff0060 0%, #ff7a00 14%, #ffe600 28%, #46ff5c 42%,
+    #00e5ff 56%, #3d5bff 70%, #b23dff 86%, #ff0060 100%);
+  /* 虹の帯をほぼ画面に収め、一度に何色も出るようにする */
+  background-size: 135% 135%;
+  animation: tlhue 26s linear infinite;
+}
+/* 中央を持ち上げて周囲を締める。かけすぎると3Dの陰影が飛ぶので控えめに */
+#tlFx .glow {
+  mix-blend-mode: overlay;
+  opacity: .32;
+  background: radial-gradient(ellipse 82% 76% at 42% 44%, rgba(255,255,255,.8), rgba(0,0,0,.32) 82%);
+}
+/* UI が乗る左と下を落として可読性を確保する */
+#tlFx .vig {
+  background:
+    linear-gradient(90deg, rgba(3,5,7,.78) 0%, rgba(3,5,7,.3) 26%, rgba(3,5,7,0) 50%, rgba(3,5,7,.3) 100%),
+    linear-gradient(0deg, rgba(3,5,7,.72) 0%, rgba(3,5,7,0) 34%);
+}
+@keyframes tlhue {
+  from { background-position: 0% 50%; }
+  to   { background-position: 100% 50%; }
+}
 
 /* ---------------- HUD ---------------- */
 #ui { position: absolute; inset: 0; pointer-events: none; }
@@ -291,19 +336,10 @@ html, body {
   box-shadow: 0 20px 60px rgba(0,0,0,.6);
 }
 
-.panel h1 {
-  margin: 0 0 6px;
-  font-size: clamp(26px, 7vw, 40px);
-  letter-spacing: .06em;
-  background: linear-gradient(180deg, #fff, #9fe8d2);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
 .panel h2 { margin: 0 0 10px; font-size: clamp(26px, 8vw, 40px); letter-spacing: .08em; }
 .panel h2.win { color: #7dffd0; text-shadow: 0 0 24px rgba(125,255,208,.5); }
 .panel h2.lose { color: var(--found); text-shadow: 0 0 24px rgba(239,68,68,.5); }
 .panel h2.paused { color: #cfe4ff; text-shadow: 0 0 24px rgba(160,200,255,.35); }
-.lead { margin: 0 0 18px; font-size: clamp(14px, 3.6vw, 17px); opacity: .92; }
 .note { margin: 12px 0 16px; font-size: 12px; opacity: .7; line-height: 1.6; }
 
 .stats { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
@@ -340,6 +376,175 @@ html, body {
 }
 .hint b { color: #9fe8d2; }
 
+/* ---------------- タイトル画面 ---------------- */
+/* 背景は #tlFx が作るので、この面自体は暗幕を持たない */
+.tscreen {
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 48px)
+    calc(env(safe-area-inset-right, 0px) + 20px)
+    calc(env(safe-area-inset-bottom, 0px) + 72px)
+    calc(env(safe-area-inset-left, 0px) + 26px);
+}
+
+.tl-main { display: flex; flex-direction: column; gap: clamp(20px, 5vh, 46px); min-width: 0; }
+
+/* ---- ロゴ ---- */
+.logo {
+  margin: 0;
+  display: flex; flex-direction: column;
+  transform: rotate(-2.5deg);
+  transform-origin: left center;
+}
+.lrow { display: flex; align-items: flex-end; animation: tlfloat 5.5s ease-in-out infinite; }
+.lrow.big { margin: -.06em 0 0 .16em; animation-delay: -2.75s; }
+.logo .ch {
+  font-size: clamp(36px, 7.4vw, 82px);
+  line-height: 1;
+  font-weight: 900;
+  color: var(--c);
+  /* 白フチを字の背面に回して、太くしても字が痩せないようにする */
+  -webkit-text-stroke: .13em #fff;
+  paint-order: stroke fill;
+  filter: drop-shadow(0 5px 0 rgba(0,0,0,.42)) drop-shadow(0 0 20px rgba(0,0,0,.5));
+}
+.logo .lrow.big .ch { font-size: clamp(52px, 10.6vw, 118px); }
+.logo .ch:nth-child(odd)  { transform: rotate(-4deg); }
+.logo .ch:nth-child(even) { transform: rotate(3.5deg) translateY(.04em); }
+@keyframes tlfloat { 50% { transform: translateY(-7px); } }
+
+/* ---- 左のメニュー ---- */
+.menu { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.mbtn {
+  pointer-events: auto;
+  -webkit-appearance: none; appearance: none;
+  width: clamp(198px, 26vw, 296px);
+  padding: 13px 22px;
+  font-family: inherit;
+  font-size: clamp(15px, 1.9vw, 19px);
+  font-weight: 800;
+  letter-spacing: .1em;
+  color: var(--ink);
+  background: var(--tglass);
+  border: 2px solid var(--neon);
+  border-radius: 4px;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 2px 14px rgba(0,0,0,.55), inset 0 0 20px rgba(61,255,110,.07);
+  transition: background .14s, color .14s, transform .08s, box-shadow .18s;
+  touch-action: none;
+}
+.mbtn.accent { color: var(--neon); }
+.mbtn:hover, .mbtn:focus-visible {
+  background: rgba(61,255,110,.18);
+  color: #eaffef;
+  box-shadow: 0 2px 14px rgba(0,0,0,.55), 0 0 18px rgba(61,255,110,.35);
+}
+.mbtn.active { transform: scale(.97); }
+.mbtn[aria-expanded="true"] { background: rgba(61,255,110,.18); color: #eaffef; }
+
+/* ---- 小さいチップボタン（ステージ選択・設定） ---- */
+.chipbtn {
+  pointer-events: auto;
+  -webkit-appearance: none; appearance: none;
+  font-family: inherit;
+  font-size: 12px; font-weight: 700; letter-spacing: .05em;
+  color: var(--ink);
+  background: var(--tglass);
+  border: 2px solid var(--neon);
+  border-radius: 3px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: background .14s, color .14s, transform .08s;
+  touch-action: none;
+}
+.chipbtn:hover, .chipbtn:focus-visible { background: rgba(61,255,110,.2); }
+.chipbtn.on { background: var(--neon); color: #06210f; }
+.chipbtn.active { transform: scale(.95); }
+.chipbtn[disabled] {
+  border-color: rgba(255,255,255,.28);
+  color: rgba(255,255,255,.45);
+  cursor: default;
+}
+.chipbtn[disabled]:hover { background: var(--tglass); }
+
+.tl-bottom {
+  position: absolute;
+  left: calc(env(safe-area-inset-left, 0px) + 26px);
+  right: calc(env(safe-area-inset-right, 0px) + 20px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.blab { font-size: 11px; font-weight: 800; letter-spacing: .2em; color: var(--neon); }
+
+/* ---- 右のカード ---- */
+.tl-side { width: min(320px, 32vw); flex: none; }
+.tcard {
+  pointer-events: auto;
+  background: var(--tglass);
+  border: 2px solid var(--neon);
+  border-radius: 5px;
+  padding: 14px 16px 16px;
+  backdrop-filter: blur(7px);
+  box-shadow: 0 4px 24px rgba(0,0,0,.55), inset 0 0 24px rgba(61,255,110,.06);
+}
+.tcard.hidden { display: none; }
+.tcard-h {
+  margin: 0 0 10px;
+  font-size: 17px; font-weight: 800; letter-spacing: .06em;
+  color: var(--neon);
+  display: flex; align-items: baseline; gap: 8px;
+}
+.tcard-h i { font-style: normal; font-size: 10px; letter-spacing: .18em; opacity: .5; color: var(--ink); }
+.tcard-p { margin: 10px 0 0; font-size: 12px; line-height: 1.75; opacity: .84; }
+.tcard-p b { color: var(--neon); }
+
+.tstat { margin: 12px 0 0; display: flex; gap: 8px; }
+.tstat > div { flex: 1; background: rgba(255,255,255,.07); border-radius: 4px; padding: 7px 10px; min-width: 0; }
+.tstat dt { font-size: 10px; opacity: .6; letter-spacing: .06em; }
+.tstat dd {
+  margin: 2px 0 0;
+  font-size: 15px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.tkeys { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.tkeys li { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.tkeys li > span { width: 68px; flex: none; opacity: .6; }
+.tkeys b {
+  font-size: 11px; font-weight: 700;
+  border: 1px solid rgba(61,255,110,.5);
+  background: rgba(61,255,110,.1);
+  border-radius: 3px; padding: 2px 7px;
+  color: #d6ffe2;
+}
+
+.trow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
+
+/* 幅が足りないときは右カードを畳んで、ロゴとメニューを優先する */
+@media (max-width: 860px) {
+  .tl-side { display: none; }
+  .tscreen { justify-content: flex-start; }
+}
+/* 低い画面（横持ちスマホ） */
+@media (max-height: 460px) {
+  .tscreen { padding-top: calc(env(safe-area-inset-top, 0px) + 40px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 58px); }
+  .tl-main { gap: 14px; }
+  .logo .ch { font-size: clamp(30px, 7vw, 54px); }
+  .logo .lrow.big .ch { font-size: clamp(40px, 9.5vw, 74px); }
+  .mbtn { padding: 9px 18px; width: clamp(170px, 30vw, 230px); }
+  .menu { gap: 7px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #tlFx .hue { animation: none; }
+  .lrow { animation: none; }
+}
+
 /* 低い画面（横持ちスマホ）向けの調整 */
 @media (max-height: 460px) {
   #stick { width: 96px; height: 96px; }
@@ -347,7 +552,6 @@ html, body {
   .gbtn { width: 62px; height: 62px; font-size: 12px; }
   .gbtn.primary { width: 76px; height: 76px; font-size: 15px; }
   .panel { padding: 14px 16px; }
-  .lead { margin-bottom: 12px; }
   .hint { margin-top: 10px; }
   #hud { font-size: 12px; }
 }

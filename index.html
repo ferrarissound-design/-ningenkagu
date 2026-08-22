@@ -15,6 +15,8 @@
 <body>
 <div id="app">
   <canvas id="scene"></canvas>
+  <!-- タイトル用の色かぶせ。canvas と同じ重ね合わせ文脈に置いて blend させる -->
+  <div id="tlFx" aria-hidden="true"><i class="hue"></i><i class="glow"></i><i class="vig"></i></div>
 
   <!-- ゲーム中のUI -->
   <div id="ui">
@@ -62,17 +64,60 @@
   <div id="warn"></div>
 
   <!-- タイトル -->
-  <div id="title" class="screen">
-    <div class="panel">
-      <h1>ニンゲン家具</h1>
-      <p class="lead">カグミンを家具に変身させて60秒生き残れ！</p>
-      <button id="btnStart" class="bigbtn" type="button">ゲーム開始</button>
-      <p class="hint">
-        <span>移動 <b>WASD</b> / <b>左スティック</b></span>
-        <span>視点 <b>ドラッグ</b></span>
-        <span>擬態 <b>E</b> / ポーズ <b>Q</b></span>
-        <span>一時停止 <b>Esc</b></span>
-      </p>
+  <div id="title" class="screen tscreen">
+    <div class="tl-main">
+      <h1 class="logo" aria-label="ニンゲン家具">
+        <span class="lrow" aria-hidden="true">
+          <b class="ch" style="--c:#ff3d8b">ニ</b><b class="ch" style="--c:#22e0ff">ン</b><b class="ch" style="--c:#ffd21e">ゲ</b><b class="ch" style="--c:#5cff7a">ン</b>
+        </span>
+        <span class="lrow big" aria-hidden="true">
+          <b class="ch" style="--c:#ff8a2b">家</b><b class="ch" style="--c:#b06bff">具</b>
+        </span>
+      </h1>
+
+      <nav class="menu">
+        <button id="btnStart" class="mbtn accent" type="button">ゲーム開始</button>
+        <button id="btnHow" class="mbtn" type="button" aria-expanded="false">あそびかた</button>
+        <button id="btnConfig" class="mbtn" type="button" aria-expanded="false">設定</button>
+      </nav>
+    </div>
+
+    <aside class="tl-side">
+      <div class="tcard" id="cardInfo">
+        <h2 class="tcard-h">カグミン<i>MIMIC</i></h2>
+        <p class="tcard-p">家具に化けて、一つ目の鬼から <b>60秒</b> 逃げ切れ。<br>鬼の目の前で家具になりきるほど高得点。</p>
+        <dl class="tstat">
+          <div><dt>ステージ</dt><dd id="selStageName">リビング</dd></div>
+          <div><dt>ベスト</dt><dd id="selStageBest">0</dd></div>
+        </dl>
+      </div>
+
+      <div class="tcard hidden" id="cardHow">
+        <h2 class="tcard-h">あそびかた<i>HOW TO</i></h2>
+        <ul class="tkeys">
+          <li><span>移動</span><b>WASD</b><b>左スティック</b></li>
+          <li><span>視点</span><b>ドラッグ</b></li>
+          <li><span>擬態</span><b>E</b></li>
+          <li><span>ポーズ</span><b>Q</b></li>
+          <li><span>一時停止</span><b>Esc</b></li>
+        </ul>
+        <p class="tcard-p">家具のそばで <b>擬態</b>。物に合った <b>ポーズ</b> でじっとしているほどバレにくい。</p>
+      </div>
+
+      <div class="tcard hidden" id="cardConfig">
+        <h2 class="tcard-h">設定<i>CONFIG</i></h2>
+        <div class="trow">
+          <span>効果音</span>
+          <button id="btnSound" class="chipbtn on" type="button" aria-pressed="true">オン</button>
+        </div>
+        <p class="tcard-p">ベストスコアと進行状況はこのブラウザに保存されます。</p>
+      </div>
+    </aside>
+
+    <div class="tl-bottom">
+      <span class="blab">STAGE</span>
+      <button class="chipbtn" type="button" data-stage="0">1　リビング</button>
+      <button class="chipbtn" type="button" data-stage="1">2　教室</button>
     </div>
   </div>
 

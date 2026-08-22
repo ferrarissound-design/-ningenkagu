@@ -119,8 +119,9 @@ export class Game {
   updateTitleCamera(dt) {
     this.titleAngle = (this.titleAngle || 0) + dt * 0.16;
     const a = this.titleAngle;
-    this.camera.position.set(Math.sin(a) * 6.6, 4.4, Math.cos(a) * 4.6);
-    this.camera.lookAt(0, 0.9, 0);
+    // 少し高く引いて、中央の遮蔽物だけで画面が埋まらないようにする
+    this.camera.position.set(Math.sin(a) * 7.1, 5.0, Math.cos(a) * 5.1);
+    this.camera.lookAt(-0.4, 0.8, -0.3);
   }
 
   update(dt, input) {

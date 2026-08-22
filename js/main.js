@@ -8,8 +8,8 @@ import { initAudio, setMuted, isMuted } from './audio.js';
 const MUTE_KEY = 'ningenkagu.muted';
 const STAGE_KEY = 'ningenkagu.stageIndex';
 const STAGES = [
-  { id: 'living', label: 'STAGE 1　リビング' },
-  { id: 'classroom', label: 'STAGE 2　教室' },
+  { id: 'living', label: 'STAGE 1　リビング', name: 'リビング' },
+  { id: 'classroom', label: 'STAGE 2　教室', name: '教室' },
 ];
 
 /** 前回クリアまで進んだステージから再開できるようにする */
@@ -53,8 +53,13 @@ function boot(renderer) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+  // タイトル中は背景を明るめにする。真っ黒だと色かぶせが乗らず、
+  // 壁より上が黒帯として残ってしまうため。
+  const TITLE_BG = new THREE.Color(0x3a4258);
+  const PLAY_BG = new THREE.Color(0x14161c);
+
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x14161c);
+  scene.background = TITLE_BG;
   scene.fog = new THREE.Fog(0x14161c, 22, 40);
 
   const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 100);
@@ -78,7 +83,9 @@ function boot(renderer) {
   scene.add(fill);
 
   const hud = new Hud();
-  let stageIndex = loadSavedStageIndex();
+  // 保存値は「到達した最高ステージ」。起動時はそこを選んだ状態から始める。
+  let unlockedMax = loadSavedStageIndex();
+  let stageIndex = unlockedMax;
   globalThis.__ningenkaguStage = STAGES[stageIndex].id;
   hud.setStage(STAGES[stageIndex].id);
   let game = new Game(scene, camera, hud);
@@ -112,6 +119,7 @@ function boot(renderer) {
   resize();
 
   // ---- UI 配線 ----
+  const appEl = document.getElementById('app');
   const titleEl = document.getElementById('title');
   const uiEl = document.getElementById('ui');
   const btnStart = document.getElementById('btnStart');
@@ -122,6 +130,19 @@ function boot(renderer) {
   const btnPause = document.getElementById('pauseBtn');
   const muteBtn = document.getElementById('muteBtn');
   const resultNote = document.getElementById('resultNote');
+  const btnHow = document.getElementById('btnHow');
+  const btnConfig = document.getElementById('btnConfig');
+  const btnSound = document.getElementById('btnSound');
+  const selStageName = document.getElementById('selStageName');
+  const selStageBest = document.getElementById('selStageBest');
+  const stageBtns = [...document.querySelectorAll('[data-stage]')];
+  const cards = {
+    info: document.getElementById('cardInfo'),
+    how: document.getElementById('cardHow'),
+    config: document.getElementById('cardConfig'),
+  };
+
+  appEl.classList.add('titlemode');
 
   /**
    * iOS / WebView では pointerdown が取りこぼされる場合があるため、
@@ -158,15 +179,44 @@ function boot(renderer) {
     for (const ring of new Set(rings)) scene.remove(ring);
   }
 
+  /** ステージ選択チップと情報カードの表示を、今の選択・解放状態に合わせる。 */
+  function syncStageUi() {
+    for (const btn of stageBtns) {
+      const i = Number(btn.dataset.stage);
+      const locked = i > unlockedMax;
+      btn.disabled = locked;
+      btn.textContent = (locked ? '🔒 ' : '') + (i + 1) + '　' + STAGES[i].name;
+      btn.classList.toggle('on', i === stageIndex && !locked);
+      btn.setAttribute('aria-pressed', String(i === stageIndex));
+      btn.title = locked ? '前のステージをクリアすると解放されます' : '';
+    }
+    if (selStageName) selStageName.textContent = STAGES[stageIndex].name;
+    if (selStageBest) selStageBest.textContent = hud.best.toLocaleString('en-US');
+  }
+
   function loadStage(index) {
     stageIndex = Math.max(0, Math.min(STAGES.length - 1, index));
-    saveStageIndex(stageIndex);
+    // 解放状態は最高到達点で保存する。下の面を選び直しても巻き戻さない。
+    unlockedMax = Math.max(unlockedMax, stageIndex);
+    saveStageIndex(unlockedMax);
     removeOldGameWorld(game);
     globalThis.__ningenkaguStage = STAGES[stageIndex].id;
     hud.setStage(STAGES[stageIndex].id);
     game = new Game(scene, camera, hud);
     resize();
+    syncStageUi();
     if (window.__ningenkagu) window.__ningenkagu.game = game;
+  }
+
+  /** 右のカードを切り替える。同じボタンをもう一度押すと基本情報に戻る。 */
+  let openCard = 'info';
+  function showCard(which) {
+    openCard = (openCard === which && which !== 'info') ? 'info' : which;
+    for (const [key, el] of Object.entries(cards)) {
+      if (el) el.classList.toggle('hidden', key !== openCard);
+    }
+    if (btnHow) btnHow.setAttribute('aria-expanded', String(openCard === 'how'));
+    if (btnConfig) btnConfig.setAttribute('aria-expanded', String(openCard === 'config'));
   }
 
   function beginCurrentStage() {
@@ -177,6 +227,8 @@ function boot(renderer) {
     // 起動エラー時に「押したのに真っ暗」になるのを防ぐ。
     game.start();
     titleEl.classList.add('hidden');
+    appEl.classList.remove('titlemode');
+    scene.background = PLAY_BG;
     uiEl.classList.add('playing');
     hud.toast(STAGES[stageIndex].label + '　隠れろ！');
     input.setEnabled(true);
@@ -196,15 +248,34 @@ function boot(renderer) {
   bindTap(btnPose, () => input.pressPose());
   bindTap(btnPause, () => game.togglePause());
   bindTap(btnResume, () => game.resume());
-  bindTap(muteBtn, () => {
+  bindTap(btnHow, () => showCard('how'));
+  bindTap(btnConfig, () => showCard('config'));
+  const toggleMute = () => {
     initAudio();
     applyMuted(!isMuted());
-  });
+  };
+  bindTap(muteBtn, toggleMute);
+  bindTap(btnSound, toggleMute);
 
+  for (const btn of stageBtns) {
+    bindTap(btn, () => {
+      const i = Number(btn.dataset.stage);
+      if (i > unlockedMax || i === stageIndex) return;
+      loadStage(i);
+    });
+  }
+  syncStageUi();
+
+  /** 音のオン / オフ。HUD の 🔊 と設定カードのボタンは同じ状態を指す。 */
   function applyMuted(m) {
     setMuted(m);
     muteBtn.textContent = m ? '🔇' : '🔊';
     muteBtn.setAttribute('aria-pressed', String(m));
+    if (btnSound) {
+      btnSound.textContent = m ? 'オフ' : 'オン';
+      btnSound.classList.toggle('on', !m);
+      btnSound.setAttribute('aria-pressed', String(!m));
+    }
     try { localStorage.setItem(MUTE_KEY, m ? '1' : '0'); } catch (e) { /* 保存できなくても続行 */ }
   }
 
