@@ -123,25 +123,28 @@ function boot(renderer) {
   const muteBtn = document.getElementById('muteBtn');
   const resultNote = document.getElementById('resultNote');
 
+  /**
+   * iOS / WebView では pointerdown が取りこぼされる場合があるため、
+   * 実処理はブラウザ標準の click に一本化する。pointer 系は押下演出だけに使う。
+   */
   function bindTap(el, fn) {
     if (!el) return;
-    el.addEventListener('pointerdown', (e) => {
+    el.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      el.classList.add('active');
-      fn();
+      try {
+        fn();
+      } catch (err) {
+        console.error(err);
+        showFatal('ゲームの処理中にエラーが発生しました。ページを再読み込みしてもう一度お試しください。');
+      }
     });
-    // Enter・Space・支援技術による通常の button click にも対応する。
-    // ポインター由来の click は pointerdown で処理済みなので重複させない。
-    el.addEventListener('click', (e) => {
-      if (e.detail !== 0) return;
-      e.preventDefault();
-      fn();
-    });
+    el.addEventListener('pointerdown', () => el.classList.add('active'));
     const clear = () => el.classList.remove('active');
     el.addEventListener('pointerup', clear);
     el.addEventListener('pointercancel', clear);
     el.addEventListener('pointerleave', clear);
+    el.addEventListener('touchend', clear, { passive: true });
   }
 
   /** ステージ切替時に旧ゲームの3Dオブジェクトを scene から外す。 */
@@ -170,9 +173,11 @@ function boot(renderer) {
     initAudio();
     hud.resetVisuals();
     hud.hideResult();
+    // 先にゲーム本体の開始が成功したことを確認してからタイトルを隠す。
+    // 起動エラー時に「押したのに真っ暗」になるのを防ぐ。
+    game.start();
     titleEl.classList.add('hidden');
     uiEl.classList.add('playing');
-    game.start();
     hud.toast(STAGES[stageIndex].label + '　隠れろ！');
     input.setEnabled(true);
   }
@@ -267,7 +272,12 @@ function boot(renderer) {
 const canvas = document.getElementById('scene');
 const renderer = createRenderer(canvas);
 if (renderer) {
-  boot(renderer);
+  try {
+    boot(renderer);
+  } catch (err) {
+    console.error(err);
+    showFatal('ゲームの初期化に失敗しました。ページを再読み込みしてもう一度お試しください。');
+  }
 } else {
   showFatal('このブラウザ・端末では WebGL を利用できないため、ゲームを表示できませんでした。別のブラウザでお試しください。');
 }
