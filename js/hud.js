@@ -39,6 +39,8 @@ export class Hud {
     this.elWarn = $('warn');
     this.elPopups = $('popups');
     this.elToast = $('toast');
+    this.elNotice = $('notice');
+    this.elNoticeText = $('noticeText');
     this.elResult = $('result');
     this.elResultTitle = $('resultTitle');
     this.elResultScore = $('resultScore');
@@ -49,6 +51,7 @@ export class Hud {
     this.elOniPtr = $('oniPtr');
 
     this._toastTimer = null;
+    this._noticeTimer = null;
     this._lastTime = -1;
     this._lastScore = -1;
     this._lastAlertCls = '';
@@ -210,6 +213,24 @@ export class Hud {
     setTimeout(() => d.remove(), 1200);
   }
 
+  /**
+   * 画面中央付近に少しの間だけ出す大きめの通知。
+   * スマホでも操作を隠さないよう、常設せず短時間で消す。
+   */
+  notice(text, cls, ms = 1500) {
+    const el = this.elNotice;
+    if (!el) return;
+    this.elNoticeText.textContent = text;
+    el.className = 'show ' + (cls || '');
+    clearTimeout(this._noticeTimer);
+    this._noticeTimer = setTimeout(() => { el.className = ''; }, ms);
+  }
+
+  hideNotice() {
+    clearTimeout(this._noticeTimer);
+    if (this.elNotice) this.elNotice.className = '';
+  }
+
   toast(text) {
     this.elToast.textContent = text;
     this.elToast.classList.add('show');
@@ -256,6 +277,7 @@ export class Hud {
     this.setWarn(0);
     this.setOniPointer(null);
     this.setPaused(false);
+    this.hideNotice();
     this.elPopups.innerHTML = '';
   }
 }

@@ -16,6 +16,14 @@ export const CONFIG = {
   surviveBonus: 300,
   evadeBonus: 300,
   evadeAfter: 4.0,
+  // --- 家具検査モード ---
+  inspectBonus: 800,      // 検査を耐え切ったときのボーナス（見逃しとは別枠）
+  inspectFailLimit: 0.5,  // これ以上「あやしい動き」がたまると検査失敗
+  inspectGainScale: 0.22, // 検査中は通常の警戒度上昇をゆるめる
+  inspectBlindScale: 0.1, // 鬼が背を向けている間はほとんど上がらない
+  inspectPassiveCap: 0.8, // じっと耐えている限り、ここより上へは自然上昇しない
+  inspectFailPenalty: 0.15, // 検査失敗そのものでは発見まで届かせない
+  inspectShortTime: 15,   // 残りがこれ未満なら検査を短縮する
   speed: { stand: 3.3, tpose: 2.6, ypose: 2.6, crouch: 1.7 },
 };
 
@@ -75,6 +83,10 @@ export class Game {
     this.tickBeep = 0;
     this.stareHold = 0;
     this.evades = 0;
+    this.inspecting = false;
+    this.inspectFail = 0;
+    this.inspectSneak = 0;
+    this.inspectPasses = 0;
     this.player.reset(this.stage.playerSpawn);
     this.oni.reset();
     this.camYaw = -Math.PI * 0.75;
@@ -207,7 +219,16 @@ export class Game {
       const centerF = 0.4 + 0.6 * sense.centrality;
       const moveF = 1 + 1.5 * clamp(this.player.speed / 3.3, 0, 1);
       const gain = CONFIG.detectBase * distF * centerF * moveF * (1 - this.mimicry) * sense.fraction;
-      this.suspicion += gain * dt;
+      if (this.oni.state === STATE.INSPECT) {
+        // 検査中は目の前で見つめられ続けるので、そのままだと必ず発見されてしまう。
+        // 自然な上昇はゆるめて上限どまりにし、代わりに
+        // 「動いた」「ポーズを変えた」といったボロを出したときだけ大きく上げる。
+        const scale = this.oni.inspectWatching ? CONFIG.inspectGainScale : CONFIG.inspectBlindScale;
+        const cap = Math.max(this.suspicion, CONFIG.inspectPassiveCap);
+        this.suspicion = Math.min(cap, this.suspicion + gain * scale * dt);
+      } else {
+        this.suspicion += gain * dt;
+      }
       this.seenTime += dt;
 
       // 見落としポイント：見られているのに気づかれていない時間ほど高得点
@@ -224,11 +245,14 @@ export class Game {
     this.suspicion = clamp(this.suspicion, 0, 1);
 
     // --- 鬼の更新 ---
+    this.oni.inspectShort = this.timeLeft < CONFIG.inspectShortTime;
     this.oni.update(dt, sense, this.suspicion);
     this.oni.updateConeShape(dt, this.stage.occluders);
+    this.updateInspect(dt);
 
     // 目の前で見つめられても正体がバレなければ「見逃し」ボーナス
-    if (this.oni.state === STATE.SUSPECT && sense.visible && sense.dist < 4.2) {
+    // （検査ボーナスと二重に出さないよう、検査中はためない）
+    if (this.oni.state === STATE.SUSPECT && !this.inspecting && sense.visible && sense.dist < 4.2) {
       this.stareHold += dt;
     } else {
       this.stareHold = Math.max(0, this.stareHold - dt * 2);
@@ -283,7 +307,86 @@ export class Game {
   /** 擬態・ポーズ変更などの「動き」で一瞬あやしまれる */
   twitch(amount) {
     if (this.state !== 'playing') return;
+    if (this.oni.state === STATE.INSPECT) {
+      // 検査中の身じろぎ（ポーズ変更・擬態変更）は検査失敗に直結する
+      this.inspectFail += amount * 4.5;
+      amount *= this.oni.inspectWatching ? 1.6 : 1.2;
+    }
     this.suspicion = clamp(this.suspicion + amount, 0, 1);
+  }
+
+  /**
+   * 家具検査モード（INSPECT）の進行。
+   * 鬼の動き自体は oni.js が持ち、ここでは
+   * 「耐えられたか／ボロを出したか」の判定とご褒美だけを見る。
+   */
+  updateInspect(dt) {
+    const oni = this.oni;
+    const active = oni.state === STATE.INSPECT;
+    if (active && !this.inspecting) {
+      this.inspecting = true;
+      this.inspectFail = 0;
+      this.inspectSneak = 0;
+      this.stareHold = 0; // 見逃しボーナスとは別枠にする
+    }
+
+    switch (oni.consumeInspectCue()) {
+      case 'start':
+        this.hud.notice(Math.random() < 0.5 ? 'じーっ……見られてる！' : '家具チェック中！', 'inspect');
+        sfx.inspect();
+        break;
+      case 'telegraph':
+        // 振り返る直前の合図。ここで止まれば間に合う
+        sfx.inspectTell();
+        break;
+      case 'turnback':
+        sfx.inspectTurn();
+        if (this.inspectSneak > 0.12) {
+          const burst = Math.min(0.4, 0.15 + this.inspectSneak * 0.45);
+          this.suspicion = clamp(this.suspicion + burst, 0, 1);
+          this.inspectFail += 0.35 + this.inspectSneak * 0.5;
+          this.hud.popup('動いたのがバレた！', 'bad');
+          sfx.danger();
+        }
+        this.inspectSneak = 0;
+        break;
+    }
+
+    if (!active) { this.inspecting = false; return; }
+
+    // --- 検査中の「あやしい動き」を集計する ---
+    const watching = oni.inspectWatching;
+    const moving = clamp(this.player.speed / 3.3, 0, 1);
+    if (this.player.speed > 0.15) {
+      if (watching) this.inspectFail += (0.35 + 0.7 * moving) * dt;
+      // 背を向けている間の移動は、振り返った瞬間にまとめて露見する
+      else this.inspectSneak += (0.4 + 0.8 * moving) * dt;
+    } else if (!watching) {
+      // 予兆に気づいて止まれば少しだけ取り返せる
+      this.inspectSneak = Math.max(0, this.inspectSneak - dt * 0.5);
+    }
+    // 擬態成功度が低いままだと、じっとしていても見抜かれていく
+    if (this.mimicry < 0.35) this.inspectFail += (watching ? 0.2 : 0.06) * dt;
+
+    // --- 検査終了の判定 ---
+    if (!oni.inspectFinished) return;
+    const ok = this.inspectFail < CONFIG.inspectFailLimit;
+    oni.endInspect(ok);
+    this.inspecting = false;
+    this.stareHold = 0;
+    if (ok) {
+      this.inspectPasses++;
+      const bonus = CONFIG.inspectBonus + 200 * (this.inspectPasses - 1);
+      this.score += bonus;
+      this.suspicion *= 0.2;
+      this.hud.popup('完全に家具だと思われた！ +' + bonus, 'good big');
+      sfx.inspectPass();
+    } else {
+      // 失敗しても発見にはしない。「しまった！」と立て直す余地を残す
+      this.suspicion = Math.min(0.95, this.suspicion + CONFIG.inspectFailPenalty);
+      this.hud.popup('あやしまれた…！', 'bad');
+      sfx.inspectFail();
+    }
   }
 
   tryMimic() {
@@ -425,6 +528,9 @@ export class Game {
 
   /** 負けた理由から次に試すヒントを出す（もう一度遊びたくさせる） */
   loseHint() {
+    if (this.inspecting) {
+      return '家具検査中に動いてしまった。鬼が背を向けても、振り返るまで完全に止まっていよう。';
+    }
     const t = this.player.mimicTarget;
     if (!t) return '生身のままだった。家具のそばで「擬態」を押して色をコピーしよう。';
     if (!this.isPoseMatched()) return `${t.label}には今のポーズが合っていない。「ポーズ◎」になる形を探そう。`;
@@ -437,23 +543,32 @@ export class Game {
 
   winHint() {
     if (this.score < 900) return '隠れきった。次は鬼の目の前で家具になりきるとスコアが跳ね上がる。';
+    if (this.inspectPasses > 0) return '家具検査を耐え切ったのが効いた。検査中は一切動かないのがコツ。';
     if (this.evades > 0) return '目の前で見逃させるのが最高効率。もっと際どい場所を狙える。';
     return '見事。もっと鬼に近い場所で粘ればさらに高得点。';
   }
 
   lose() {
     this.state = 'lose';
+    const hint = this.loseHint();
+    this.oni.abortInspect();
+    this.inspecting = false;
+    this.hud.hideNotice();
     this.hud.setOniPointer(null);
     this.oni.state = STATE.FOUND;
     this.suspicion = 1;
     this.player.reactFound();
     this.hud.setWarn(1);
     sfx.found();
-    this.hud.showResult(false, Math.floor(this.score), this.survived, this.loseHint());
+    this.hud.showResult(false, Math.floor(this.score), this.survived, hint);
   }
 
   win() {
     this.state = 'win';
+    const hint = this.winHint();
+    this.oni.abortInspect();
+    this.inspecting = false;
+    this.hud.hideNotice();
     this.hud.setOniPointer(null);
     this.timeLeft = 0;
     this.survived = CONFIG.timeLimit;
@@ -461,7 +576,7 @@ export class Game {
     this.player.reactWin();
     sfx.win();
     this.hud.setWarn(0);
-    this.hud.showResult(true, Math.floor(this.score), this.survived, this.winHint());
+    this.hud.showResult(true, Math.floor(this.score), this.survived, hint);
   }
 }
 
