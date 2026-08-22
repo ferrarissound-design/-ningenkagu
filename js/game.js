@@ -55,6 +55,7 @@ export class Game {
     this._v = new THREE.Vector3();
     this._dir2 = new THREE.Vector3();
     this._orig = new THREE.Vector3();
+    this._proj = new THREE.Vector3();
     this.backdropColor = new THREE.Color(0xcfc7b6);
     this.defaultBackdrop = new THREE.Color(0xcfc7b6);
 
@@ -87,12 +88,31 @@ export class Game {
     this.hud.setTime(this.timeLeft);
     this.hud.setRisk(1, false);
     this.hud.setWarn(0);
+    this.hud.setOniPointer(null);
+    this.hud.setPaused(false);
   }
 
   start() {
     this.reset();
     this.state = 'playing';
     this.hud.toast('隠れろ！');
+  }
+
+  pause() {
+    if (this.state !== 'playing') return;
+    this.state = 'paused';
+    this.hud.setPaused(true);
+  }
+
+  resume() {
+    if (this.state !== 'paused') return;
+    this.state = 'playing';
+    this.hud.setPaused(false);
+  }
+
+  togglePause() {
+    if (this.state === 'paused') this.resume();
+    else this.pause();
   }
 
   /** タイトル画面用：部屋全体をゆっくり見せるカメラ */
@@ -105,6 +125,16 @@ export class Game {
 
   update(dt, input) {
     this.fx.update(dt);
+
+    if (this.state === 'paused') {
+      const wantResume = input.consumePause();
+      // 残りの入力は捨てる（再開した瞬間に擬態やポーズが暴発しないように）
+      input.clearActions();
+      if (wantResume) this.resume();
+      this.updateCamera(dt, false);
+      return;
+    }
+
     if (this.state !== 'playing') {
       if (this.state === 'title') this.updateTitleCamera(dt);
       else this.updateCamera(dt, false);
@@ -116,6 +146,8 @@ export class Game {
     }
 
     // --- 入力 ---
+    if (input.consumePause()) { this.pause(); return; }
+
     const look = input.consumeLook();
     this.camYaw -= look.dx * 0.0045;
     this.camPitch = clamp(this.camPitch + look.dy * 0.0035, 0.05, 1.05);
@@ -241,6 +273,7 @@ export class Game {
     this.hud.setPose(this.player.pose);
 
     this.updateCamera(dt, false);
+    this.updateOniPointer();
 
     if (this.suspicion >= 1) this.lose();
     else if (this.timeLeft <= 0) this.win();
@@ -364,6 +397,31 @@ export class Game {
     this.camera.lookAt(this.camTarget);
   }
 
+  /**
+   * 鬼が画面に映っていないとき、どちらにいるかを画面ふちの矢印で伝える。
+   * 三人称視点＋狭い画角だと、真後ろの鬼にまったく気づけないため。
+   */
+  updateOniPointer() {
+    const cam = this.camera;
+    // project() は最新の行列を必要とする。描画はこの後なので自前で更新しておく
+    // （Camera.updateMatrixWorld は matrixWorldInverse も更新してくれる）
+    cam.updateMatrixWorld();
+
+    const op = this.oni.position;
+    const v = this._proj.set(op.x, 1.35, op.z).project(cam);
+    let x = v.x;
+    let y = v.y;
+    // カメラ後方は投影が反転するので向きを戻す
+    const behind = v.z > 1;
+    if (behind) { x = -x; y = -y; }
+
+    if (!behind && Math.abs(x) <= 0.9 && Math.abs(y) <= 0.9) {
+      this.hud.setOniPointer(null);
+      return;
+    }
+    this.hud.setOniPointer(Math.atan2(y, x), this.oni.state);
+  }
+
   /** 負けた理由から次に試すヒントを出す（もう一度遊びたくさせる） */
   loseHint() {
     const t = this.player.mimicTarget;
@@ -384,6 +442,7 @@ export class Game {
 
   lose() {
     this.state = 'lose';
+    this.hud.setOniPointer(null);
     this.oni.state = STATE.FOUND;
     this.suspicion = 1;
     this.player.reactFound();
@@ -394,6 +453,7 @@ export class Game {
 
   win() {
     this.state = 'win';
+    this.hud.setOniPointer(null);
     this.timeLeft = 0;
     this.survived = CONFIG.timeLimit;
     this.score += CONFIG.surviveBonus;

@@ -124,6 +124,41 @@ html, body {
 @keyframes warnpulse { from { filter: brightness(.8); } to { filter: brightness(1.5); } }
 @keyframes blink { 50% { opacity: .25; } }
 
+/* ---------------- 鬼の方向インジケータ ---------------- */
+/* 画面の外にいる鬼の向きを、画面ふちの矢印で知らせる */
+#oniPtr {
+  position: absolute;
+  width: 44px; height: 44px;
+  margin: -22px 0 0 -22px;
+  color: #ffd166;
+  opacity: 0;
+  transition: opacity .18s, color .25s;
+}
+#oniPtr.show { opacity: .92; }
+#ui:not(.playing) #oniPtr { opacity: 0; }
+#oniPtr[data-state="suspect"] { color: #ff7043; }
+#oniPtr[data-state="found"] { color: #ff2d2d; }
+#oniPtr .eye {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-size: 17px; line-height: 1;
+  background: rgba(10, 12, 16, .72);
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0,0,0,.6);
+}
+#oniPtr .arrow { position: absolute; inset: 0; transform: rotate(var(--ang, 0rad)); }
+#oniPtr .arrow::before {
+  content: '';
+  position: absolute; top: 50%; left: 100%;
+  margin: -8px 0 0 2px;
+  width: 0; height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 13px solid currentColor;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.8));
+}
+
 /* ---------------- ポップアップ / トースト ---------------- */
 #popups {
   position: absolute; left: 0; right: 0; top: 34%;
@@ -211,10 +246,15 @@ html, body {
 }
 .gbtn.active { transform: scale(.92); background: rgba(255,255,255,.28); }
 
-#muteBtn {
+/* タイトル・ポーズ・リザルト（z-index:10）より上に置き、いつでも押せるようにする */
+#sysBtns {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0px) + 8px);
   right: calc(env(safe-area-inset-right, 0px) + 10px);
+  display: flex; gap: 6px;
+  z-index: 20;
+}
+#sysBtns button {
   pointer-events: auto;
   -webkit-appearance: none; appearance: none;
   border: 1px solid rgba(255,255,255,.14);
@@ -222,7 +262,13 @@ html, body {
   color: var(--ink);
   width: 34px; height: 34px; border-radius: 9px;
   font-size: 15px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  backdrop-filter: blur(6px);
+  transition: transform .08s, background .12s;
 }
+#sysBtns button.active { transform: scale(.9); background: rgba(255,255,255,.24); }
+/* ポーズはプレイ中だけ意味があるので、それ以外では隠す */
+#ui:not(.playing) #pauseBtn { display: none; }
 
 /* ---------------- タイトル / リザルト ---------------- */
 .screen {
@@ -256,6 +302,7 @@ html, body {
 .panel h2 { margin: 0 0 10px; font-size: clamp(26px, 8vw, 40px); letter-spacing: .08em; }
 .panel h2.win { color: #7dffd0; text-shadow: 0 0 24px rgba(125,255,208,.5); }
 .panel h2.lose { color: var(--found); text-shadow: 0 0 24px rgba(239,68,68,.5); }
+.panel h2.paused { color: #cfe4ff; text-shadow: 0 0 24px rgba(160,200,255,.35); }
 .lead { margin: 0 0 18px; font-size: clamp(14px, 3.6vw, 17px); opacity: .92; }
 .note { margin: 12px 0 16px; font-size: 12px; opacity: .7; line-height: 1.6; }
 

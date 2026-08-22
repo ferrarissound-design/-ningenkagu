@@ -40,6 +40,8 @@
       </div>
     </div>
 
+    <div id="oniPtr" aria-hidden="true"><span class="eye">👁</span><span class="arrow"></span></div>
+
     <div id="popups"></div>
     <div id="toast"></div>
 
@@ -51,7 +53,10 @@
       </div>
     </div>
 
-    <button id="muteBtn" type="button">🔊</button>
+    <div id="sysBtns">
+      <button id="pauseBtn" type="button" aria-label="ポーズ">⏸</button>
+      <button id="muteBtn" type="button" aria-label="音のオン / オフ">🔊</button>
+    </div>
   </div>
 
   <div id="warn"></div>
@@ -66,7 +71,18 @@
         <span>移動 <b>WASD</b> / <b>左スティック</b></span>
         <span>視点 <b>ドラッグ</b></span>
         <span>擬態 <b>E</b> / ポーズ <b>Q</b></span>
+        <span>一時停止 <b>Esc</b></span>
       </p>
+    </div>
+  </div>
+
+  <!-- ポーズ -->
+  <div id="pause" class="screen hidden">
+    <div class="panel">
+      <h2 class="paused">PAUSE</h2>
+      <p class="note">タイマーも鬼も止まっています。</p>
+      <button id="btnResume" class="bigbtn" type="button">再開する</button>
+      <p class="hint"><span>再開 <b>Esc</b> / <b>P</b></span></p>
     </div>
   </div>
 
@@ -81,6 +97,14 @@
       </div>
       <p id="resultNote" class="note"></p>
       <button id="btnRetry" class="bigbtn" type="button">もう一度遊ぶ</button>
+    </div>
+  </div>
+
+  <!-- 起動できなかったときの案内 -->
+  <div id="fatal" class="screen hidden">
+    <div class="panel">
+      <h2 class="lose">起動できません</h2>
+      <p class="note" id="fatalNote"></p>
     </div>
   </div>
 </div>

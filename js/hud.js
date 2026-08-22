@@ -3,6 +3,22 @@ import { POSE_LABEL } from './player.js';
 
 const $ = (id) => document.getElementById(id);
 
+const BEST_KEY = 'ningenkagu.best';
+
+/** localStorage が使えない環境（プライベートモード等）でも落ちないようにする */
+function loadBest() {
+  try {
+    const v = parseInt(localStorage.getItem(BEST_KEY) || '0', 10);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function saveBest(v) {
+  try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) { /* 保存できなくても続行 */ }
+}
+
 export class Hud {
   constructor() {
     this.elTime = $('time');
@@ -25,12 +41,28 @@ export class Hud {
     this.elResultTime = $('resultTime');
     this.elResultNote = $('resultNote');
     this.elBest = $('bestScore');
+    this.elPause = $('pause');
+    this.elOniPtr = $('oniPtr');
 
     this._toastTimer = null;
     this._lastTime = -1;
     this._lastScore = -1;
     this._lastAlertCls = '';
-    this.best = 0;
+    // 毎フレームの無駄な DOM 書き込み（＝スタイル再計算）を避けるためのキャッシュ
+    this._lastRisk = '';
+    this._lastRiskOn = null;
+    this._lastRiskHot = null;
+    this._lastMimicLabel = '';
+    this._lastPoseOk = null;
+    this._lastPose = '';
+    this._lastStealth = -1;
+    this._lastAlertPct = -1;
+    this._lastWarn = -1;
+    this._lastWarnPulse = null;
+    this._ptrShown = false;
+    this._ptrState = '';
+    this.best = loadBest();
+    this.elBest.textContent = this.best.toLocaleString('en-US');
     this.onResultChange = null;
   }
 
@@ -49,32 +81,59 @@ export class Hud {
   }
 
   setRisk(mult, active) {
-    this.elRisk.textContent = 'x' + mult.toFixed(1);
-    this.elRiskChip.classList.toggle('on', active);
-    this.elRiskChip.classList.toggle('hot', active && mult > 4);
-    this.elRiskChip.classList.toggle('dim', !active);
+    const text = 'x' + mult.toFixed(1);
+    if (text !== this._lastRisk) {
+      this._lastRisk = text;
+      this.elRisk.textContent = text;
+    }
+    const hot = active && mult > 4;
+    if (active !== this._lastRiskOn) {
+      this._lastRiskOn = active;
+      this.elRiskChip.classList.toggle('on', active);
+      this.elRiskChip.classList.toggle('dim', !active);
+    }
+    if (hot !== this._lastRiskHot) {
+      this._lastRiskHot = hot;
+      this.elRiskChip.classList.toggle('hot', hot);
+    }
   }
 
   setMimic(target, poseOk) {
-    this.elMimic.textContent = target ? target.label : 'なし（カグミン）';
-    this.elMimic.classList.toggle('none', !target);
-    this.elPoseOk.textContent = target ? (poseOk ? 'ポーズ◎' : 'ポーズ△') : '';
-    this.elPoseOk.className = target ? (poseOk ? 'ok' : 'ng') : '';
+    const label = target ? target.label : 'なし（カグミン）';
+    if (label !== this._lastMimicLabel) {
+      this._lastMimicLabel = label;
+      this.elMimic.textContent = label;
+      this.elMimic.classList.toggle('none', !target);
+    }
+    const ok = target ? !!poseOk : null;
+    if (ok !== this._lastPoseOk) {
+      this._lastPoseOk = ok;
+      this.elPoseOk.textContent = target ? (poseOk ? 'ポーズ◎' : 'ポーズ△') : '';
+      this.elPoseOk.className = target ? (poseOk ? 'ok' : 'ng') : '';
+    }
   }
 
   setPose(pose) {
-    if (this.elPose) this.elPose.textContent = POSE_LABEL[pose] || '';
+    if (!this.elPose || pose === this._lastPose) return;
+    this._lastPose = pose;
+    this.elPose.textContent = POSE_LABEL[pose] || '';
   }
 
   setStealth(v) {
     const p = Math.round(v * 100);
+    if (p === this._lastStealth) return;
+    this._lastStealth = p;
     this.elStealth.style.width = p + '%';
     this.elStealth.className = p >= 70 ? 'good' : p >= 40 ? 'mid' : 'bad';
     if (this.elStealthVal) this.elStealthVal.textContent = p + '%';
   }
 
   setAlert(v, level) {
-    this.elAlert.style.width = Math.round(v * 100) + '%';
+    const p = Math.round(v * 100);
+    if (p !== this._lastAlertPct) {
+      this._lastAlertPct = p;
+      this.elAlert.style.width = p + '%';
+    }
     if (level.cls !== this._lastAlertCls) {
       this._lastAlertCls = level.cls;
       this.elAlert.className = level.cls;
@@ -85,8 +144,49 @@ export class Hud {
 
   setWarn(v) {
     const o = v < 0.3 ? 0 : Math.min(1, (v - 0.3) / 0.7);
-    this.elWarn.style.opacity = o.toFixed(3);
-    this.elWarn.classList.toggle('pulse', v > 0.62);
+    const q = Math.round(o * 50);
+    if (q !== this._lastWarn) {
+      this._lastWarn = q;
+      this.elWarn.style.opacity = (q / 50).toFixed(2);
+    }
+    const pulse = v > 0.62;
+    if (pulse !== this._lastWarnPulse) {
+      this._lastWarnPulse = pulse;
+      this.elWarn.classList.toggle('pulse', pulse);
+    }
+  }
+
+  /**
+   * 画面外にいる鬼の方向を示す。
+   * @param {number|null} angle 画面中心から見た向き（ラジアン・上が +）。null で非表示
+   * @param {string} state 鬼の状態（色分けに使う）
+   */
+  setOniPointer(angle, state) {
+    const el = this.elOniPtr;
+    if (!el) return;
+    if (angle === null) {
+      if (this._ptrShown) {
+        this._ptrShown = false;
+        el.classList.remove('show');
+      }
+      return;
+    }
+    if (!this._ptrShown) {
+      this._ptrShown = true;
+      el.classList.add('show');
+    }
+    // 画面中央を原点とした楕円上に置く
+    el.style.left = (50 + Math.cos(angle) * 40).toFixed(1) + '%';
+    el.style.top = (50 - Math.sin(angle) * 37).toFixed(1) + '%';
+    el.style.setProperty('--ang', (-angle).toFixed(3) + 'rad');
+    if (state !== this._ptrState) {
+      this._ptrState = state;
+      el.dataset.state = state;
+    }
+  }
+
+  setPaused(on) {
+    this.elPause.classList.toggle('hidden', !on);
   }
 
   popup(text, cls) {
@@ -106,7 +206,10 @@ export class Hud {
 
   showResult(win, score, survived, note) {
     const isBest = score > this.best;
-    if (isBest) this.best = score;
+    if (isBest) {
+      this.best = score;
+      saveBest(this.best);
+    }
     this.elResultTitle.textContent = win ? 'SURVIVED!' : 'FOUND!';
     this.elResultTitle.className = win ? 'win' : 'lose';
     this.elResultScore.textContent = score.toLocaleString('en-US');
@@ -127,7 +230,19 @@ export class Hud {
     this._lastTime = -1;
     this._lastScore = -1;
     this._lastAlertCls = '';
+    this._lastRisk = '';
+    this._lastRiskOn = null;
+    this._lastRiskHot = null;
+    this._lastMimicLabel = '';
+    this._lastPoseOk = null;
+    this._lastPose = '';
+    this._lastStealth = -1;
+    this._lastAlertPct = -1;
+    this._lastWarn = -1;
+    this._lastWarnPulse = null;
     this.setWarn(0);
+    this.setOniPointer(null);
+    this.setPaused(false);
     this.elPopups.innerHTML = '';
   }
 }
