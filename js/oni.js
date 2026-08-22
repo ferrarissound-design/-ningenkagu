@@ -8,7 +8,7 @@ export const VIEW = {
   halfAngle: 0.63,     // 約36度
   periRange: 3.4,      // 至近距離の広い視界
   periHalfAngle: 1.5,  // 約86度
-  eyeHeight: 1.62,
+  eyeHeight: 1.54,
 };
 
 export const STATE = { PATROL: 'patrol', LOOK: 'look', SUSPECT: 'suspect', FOUND: 'found' };
@@ -22,59 +22,90 @@ export class Oni {
     this.root = new THREE.Group();
     scene.add(this.root);
 
-    const skin = 0x8e3b52;
-    const cloth = 0x2f2536;
-    const mk = (c, e = 0x000000) => new THREE.MeshStandardMaterial({
-      color: new THREE.Color(c), roughness: 0.6, metalness: 0.1,
+    const purple = 0x7658c9;
+    const purpleLight = 0x9a79df;
+    const purpleDark = 0x413661;
+    const mk = (c, e = 0x000000, roughness = 0.72) => new THREE.MeshStandardMaterial({
+      color: new THREE.Color(c), roughness, metalness: 0.05,
       emissive: new THREE.Color(e),
     });
-    const box = (w, h, d, y, c, x = 0, z = 0) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mk(c));
-      m.position.set(x, y, z);
+    const sphereGeo = new THREE.SphereGeometry(1, 14, 10);
+    const orb = (rx, ry, rz, c, e = 0x000000, roughness = 0.72) => {
+      const m = new THREE.Mesh(sphereGeo, mk(c, e, roughness));
+      m.scale.set(rx, ry, rz);
       m.castShadow = true;
+      m.receiveShadow = true;
       return m;
     };
 
-    // 体（前は +Z）
+    // 丸い一つ目の見回りモンスター（前は +Z）
     this.body = new THREE.Group();
     this.root.add(this.body);
-    this.body.add(box(0.62, 0.78, 0.34, 1.22, cloth));
-    this.body.add(box(0.2, 0.12, 0.2, 1.68, skin));
+    const torso = orb(0.5, 0.59, 0.4, purple);
+    torso.position.y = 0.96;
+    this.body.add(torso);
+    const belly = orb(0.31, 0.36, 0.04, purpleLight);
+    belly.position.set(0, 0.9, 0.385);
+    this.body.add(belly);
 
     this.head = new THREE.Group();
-    this.head.position.y = 1.62;
+    this.head.position.y = 1.48;
     this.body.add(this.head);
-    const headMesh = box(0.36, 0.36, 0.34, 0.2, skin);
+    const headMesh = orb(0.44, 0.4, 0.4, purpleLight);
     this.head.add(headMesh);
-    // 角
-    for (const sx of [-0.11, 0.11]) {
-      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 6), mk(0xf0e6d2));
-      horn.position.set(sx, 0.45, -0.02);
+    // 短く丸みのある角
+    for (const side of [-1, 1]) {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.23, 8), mk(0xffe2a8));
+      horn.position.set(side * 0.24, 0.4, -0.02);
+      horn.rotation.z = side * -0.25;
+      horn.castShadow = true;
       this.head.add(horn);
     }
-    // 光る目（前方 +Z）
-    this.eyeMat = mk(0xffdd55, 0xffcc33);
-    for (const sx of [-0.09, 0.09]) {
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.04), this.eyeMat);
-      eye.position.set(sx, 0.24, 0.18);
-      this.head.add(eye);
-    }
+
+    // 表情豊かな一つ目。目全体を伸縮して警戒状態を伝える
+    this.eyeGroup = new THREE.Group();
+    this.eyeGroup.position.set(0, 0.055, 0.39);
+    this.head.add(this.eyeGroup);
+    const eyeWhite = orb(0.225, 0.18, 0.058, 0xfff7e7, 0x15100a, 0.45);
+    this.eyeGroup.add(eyeWhite);
+    this.eyeMat = mk(0xffcf45, 0xffa91f, 0.38);
+    const iris = new THREE.Mesh(sphereGeo, this.eyeMat);
+    iris.scale.set(0.12, 0.13, 0.038);
+    iris.position.z = 0.055;
+    this.eyeGroup.add(iris);
+    const pupil = orb(0.052, 0.076, 0.026, 0x21192c, 0x08050c, 0.4);
+    pupil.position.z = 0.086;
+    this.eyeGroup.add(pupil);
+    this.eyeBaseScale = this.eyeGroup.scale.clone();
+
+    this.mouth = orb(0.075, 0.027, 0.022, purpleDark, 0x08050c, 0.5);
+    this.mouth.position.set(0, -0.205, 0.392);
+    this.mouthBaseScale = this.mouth.scale.clone();
+    this.head.add(this.mouth);
 
     this.arms = [];
     for (const side of [1, -1]) {
       const pivot = new THREE.Group();
-      pivot.position.set(side * 0.4, 1.5, 0);
-      const arm = box(0.16, 0.62, 0.16, -0.31, skin);
+      pivot.position.set(side * 0.48, 1.16, 0);
+      const arm = orb(0.12, 0.27, 0.12, purpleLight);
+      arm.position.y = -0.24;
       pivot.add(arm);
+      const hand = orb(0.145, 0.13, 0.14, purpleLight);
+      hand.position.y = -0.49;
+      pivot.add(hand);
       this.body.add(pivot);
       this.arms.push({ pivot, side });
     }
     this.legs = [];
     for (const side of [1, -1]) {
       const pivot = new THREE.Group();
-      pivot.position.set(side * 0.16, 0.86, 0);
-      const leg = box(0.2, 0.86, 0.22, -0.43, cloth);
+      pivot.position.set(side * 0.18, 0.62, 0);
+      const leg = orb(0.14, 0.28, 0.16, purpleDark);
+      leg.position.y = -0.24;
       pivot.add(leg);
+      const foot = orb(0.18, 0.12, 0.24, purpleDark);
+      foot.position.set(0, -0.48, 0.065);
+      pivot.add(foot);
       this.body.add(pivot);
       this.legs.push({ pivot, side });
     }
@@ -107,6 +138,10 @@ export class Oni {
 
   reset() {
     this.root.position.copy(this.stage.oniSpawn);
+    this.body.position.set(0, 0, 0);
+    this.body.rotation.set(0, 0, 0);
+    this.eyeGroup.scale.copy(this.eyeBaseScale);
+    this.mouth.scale.copy(this.mouthBaseScale);
     // 開始直後はプレイヤーに背を向けて、隠れる時間を少し与える
     const ps = this.stage.playerSpawn;
     this.facing = Math.atan2(this.root.position.x - ps.x, this.root.position.z - ps.z);
@@ -117,6 +152,7 @@ export class Oni {
     this.stateTimer = 2.0;
     this.stuckTimer = 0;
     this.walkPhase = 0;
+    this.idlePhase = 0;
     this.speed = 0;
     this.lastSeen = new THREE.Vector3();
     this.stareTimer = 0;
@@ -246,6 +282,7 @@ export class Oni {
   }
 
   update(dt, sense, suspicion) {
+    this.idlePhase += dt;
     // --- 状態遷移 ---
     if (this.state !== STATE.FOUND) {
       if (suspicion >= 0.4 && sense.visible) {
@@ -278,6 +315,27 @@ export class Oni {
       a.pivot.rotation.x = damp(a.pivot.rotation.x, raise - a.side * swing * 0.7, 12, dt);
       a.pivot.rotation.z = damp(a.pivot.rotation.z, a.side * 0.12, 10, dt);
     }
+
+    // 丸い体を弾ませ、状態に応じて一つ目の表情を変える
+    const bob = moving
+      ? Math.abs(Math.sin(this.walkPhase)) * 0.05
+      : Math.sin(this.idlePhase * 1.8) * 0.022;
+    const lean = moving ? Math.sin(this.walkPhase) * 0.035 : 0;
+    this.body.position.y = damp(this.body.position.y, bob, 10, dt);
+    this.body.rotation.z = damp(this.body.rotation.z, lean, 9, dt);
+
+    let eyeX = 1, eyeY = 1, mouthX = 1, mouthY = 1;
+    if (this.state === STATE.SUSPECT) {
+      eyeX = 1.12; eyeY = 0.72;
+      mouthX = 1.25; mouthY = 0.72;
+    } else if (this.state === STATE.FOUND) {
+      eyeX = 1.28; eyeY = 1.22;
+      mouthX = 0.72; mouthY = 2.0;
+    }
+    this.eyeGroup.scale.x = damp(this.eyeGroup.scale.x, this.eyeBaseScale.x * eyeX, 12, dt);
+    this.eyeGroup.scale.y = damp(this.eyeGroup.scale.y, this.eyeBaseScale.y * eyeY, 12, dt);
+    this.mouth.scale.x = damp(this.mouth.scale.x, this.mouthBaseScale.x * mouthX, 12, dt);
+    this.mouth.scale.y = damp(this.mouth.scale.y, this.mouthBaseScale.y * mouthY, 12, dt);
 
     // 視界コーンの色
     const c = this.coneMat.color;

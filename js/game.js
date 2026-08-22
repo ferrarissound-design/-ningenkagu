@@ -386,6 +386,7 @@ export class Game {
     this.state = 'lose';
     this.oni.state = STATE.FOUND;
     this.suspicion = 1;
+    this.player.reactFound();
     this.hud.setWarn(1);
     sfx.found();
     this.hud.showResult(false, Math.floor(this.score), this.survived, this.loseHint());
@@ -396,6 +397,7 @@ export class Game {
     this.timeLeft = 0;
     this.survived = CONFIG.timeLimit;
     this.score += CONFIG.surviveBonus;
+    this.player.reactWin();
     sfx.win();
     this.hud.setWarn(0);
     this.hud.showResult(true, Math.floor(this.score), this.survived, this.winHint());

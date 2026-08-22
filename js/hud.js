@@ -56,7 +56,7 @@ export class Hud {
   }
 
   setMimic(target, poseOk) {
-    this.elMimic.textContent = target ? target.label : 'なし（生身）';
+    this.elMimic.textContent = target ? target.label : 'なし（カグミン）';
     this.elMimic.classList.toggle('none', !target);
     this.elPoseOk.textContent = target ? (poseOk ? 'ポーズ◎' : 'ポーズ△') : '';
     this.elPoseOk.className = target ? (poseOk ? 'ok' : 'ng') : '';
