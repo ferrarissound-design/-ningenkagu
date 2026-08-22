@@ -6,10 +6,25 @@ import { Input } from './input.js';
 import { initAudio, setMuted, isMuted } from './audio.js';
 
 const MUTE_KEY = 'ningenkagu.muted';
+const STAGE_KEY = 'ningenkagu.stageIndex';
 const STAGES = [
   { id: 'living', label: 'STAGE 1　リビング' },
   { id: 'classroom', label: 'STAGE 2　教室' },
 ];
+
+/** 前回クリアまで進んだステージから再開できるようにする */
+function loadSavedStageIndex() {
+  try {
+    const v = parseInt(localStorage.getItem(STAGE_KEY) || '0', 10);
+    return Number.isFinite(v) ? Math.max(0, Math.min(STAGES.length - 1, v)) : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function saveStageIndex(index) {
+  try { localStorage.setItem(STAGE_KEY, String(index)); } catch (e) { /* 保存できなくても続行 */ }
+}
 
 /** 起動できなかった理由を画面に出す（真っ暗なまま放置しない） */
 function showFatal(message) {
@@ -63,8 +78,9 @@ function boot(renderer) {
   scene.add(fill);
 
   const hud = new Hud();
-  let stageIndex = 0;
+  let stageIndex = loadSavedStageIndex();
   globalThis.__ningenkaguStage = STAGES[stageIndex].id;
+  hud.setStage(STAGES[stageIndex].id);
   let game = new Game(scene, camera, hud);
 
   const input = new Input(renderer.domElement, {
@@ -141,8 +157,10 @@ function boot(renderer) {
 
   function loadStage(index) {
     stageIndex = Math.max(0, Math.min(STAGES.length - 1, index));
+    saveStageIndex(stageIndex);
     removeOldGameWorld(game);
     globalThis.__ningenkaguStage = STAGES[stageIndex].id;
+    hud.setStage(STAGES[stageIndex].id);
     game = new Game(scene, camera, hud);
     resize();
     if (window.__ningenkagu) window.__ningenkagu.game = game;

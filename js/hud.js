@@ -3,20 +3,24 @@ import { POSE_LABEL } from './player.js';
 
 const $ = (id) => document.getElementById(id);
 
-const BEST_KEY = 'ningenkagu.best';
+const BEST_KEY_PREFIX = 'ningenkagu.best.';
+const LEGACY_BEST_KEY = 'ningenkagu.best';
 
 /** localStorage が使えない環境（プライベートモード等）でも落ちないようにする */
-function loadBest() {
+function loadBest(stageId) {
   try {
-    const v = parseInt(localStorage.getItem(BEST_KEY) || '0', 10);
+    const raw = localStorage.getItem(BEST_KEY_PREFIX + stageId);
+    // 旧バージョン（ステージ区別なし）のスコアは living のベストとして引き継ぐ
+    const fallback = stageId === 'living' ? localStorage.getItem(LEGACY_BEST_KEY) : null;
+    const v = parseInt(raw ?? fallback ?? '0', 10);
     return Number.isFinite(v) && v > 0 ? v : 0;
   } catch (e) {
     return 0;
   }
 }
 
-function saveBest(v) {
-  try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) { /* 保存できなくても続行 */ }
+function saveBest(stageId, v) {
+  try { localStorage.setItem(BEST_KEY_PREFIX + stageId, String(v)); } catch (e) { /* 保存できなくても続行 */ }
 }
 
 export class Hud {
@@ -61,9 +65,18 @@ export class Hud {
     this._lastWarnPulse = null;
     this._ptrShown = false;
     this._ptrState = '';
-    this.best = loadBest();
+    this.stageId = 'living';
+    this.best = loadBest(this.stageId);
     this.elBest.textContent = this.best.toLocaleString('en-US');
     this.onResultChange = null;
+  }
+
+  /** 表示中のベストスコアを、そのステージのものに切り替える */
+  setStage(stageId) {
+    this.stageId = stageId;
+    this.best = loadBest(stageId);
+    this.elBest.textContent = this.best.toLocaleString('en-US');
+    this.elBest.parentElement.classList.remove('best');
   }
 
   setTime(sec) {
@@ -208,7 +221,7 @@ export class Hud {
     const isBest = score > this.best;
     if (isBest) {
       this.best = score;
-      saveBest(this.best);
+      saveBest(this.stageId, this.best);
     }
     this.elResultTitle.textContent = win ? 'SURVIVED!' : 'FOUND!';
     this.elResultTitle.className = win ? 'win' : 'lose';
