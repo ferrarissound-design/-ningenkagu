@@ -48,6 +48,28 @@ export const sfx = {
     tone(120, 0.6, { type: 'square', gain: 0.12 });
   },
   evade() { tone(880, 0.12, { type: 'sine', gain: 0.1 }); tone(1320, 0.18, { type: 'sine', gain: 0.09, delay: 0.09 }); },
+  // --- 家具検査モード ---
+  /** 検査開始：「んん？」と覗き込む感じの2音 */
+  inspect() {
+    tone(430, 0.13, { type: 'triangle', gain: 0.1, slideTo: 620 });
+    tone(620, 0.16, { type: 'triangle', gain: 0.09, slideTo: 520, delay: 0.13 });
+  },
+  /** 振り返る直前の予兆。短くコツッと鳴らして「くるぞ」と伝える */
+  inspectTell() {
+    tone(1150, 0.05, { type: 'square', gain: 0.05 });
+    tone(1150, 0.05, { type: 'square', gain: 0.05, delay: 0.12 });
+  },
+  /** 振り返った瞬間 */
+  inspectTurn() { tone(880, 0.14, { type: 'sawtooth', gain: 0.08, slideTo: 300 }); },
+  /** 検査を耐え切った（見逃しボーナスとは別の、明るい上昇音） */
+  inspectPass() {
+    [660, 880, 1100, 1480].forEach((f, i) => tone(f, 0.2, { type: 'triangle', gain: 0.11, delay: i * 0.07 }));
+  },
+  /** 検査に失敗（発見ではないので重すぎない音にする） */
+  inspectFail() {
+    tone(420, 0.16, { type: 'square', gain: 0.08, slideTo: 250 });
+    tone(250, 0.2, { type: 'sawtooth', gain: 0.06, delay: 0.1 });
+  },
   win() {
     [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.28, { type: 'triangle', gain: 0.13, delay: i * 0.11 }));
   },
