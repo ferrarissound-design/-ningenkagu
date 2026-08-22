@@ -94,8 +94,11 @@ export class Input {
       const r = el.getBoundingClientRect();
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
-      let dx = e.clientX - cx;
-      let dy = e.clientY - cy;
+      // ピンチ拡大時は UI レイヤが縮小表示されているので、
+      // 指の移動量をスティック自身の座標系へ戻してから使う（等倍なら k = 1）
+      const k = el.offsetWidth && r.width ? el.offsetWidth / r.width : 1;
+      let dx = (e.clientX - cx) * k;
+      let dy = (e.clientY - cy) * k;
       const d = Math.hypot(dx, dy);
       const max = this.stickRadius;
       if (d > max) { dx = (dx / d) * max; dy = (dy / d) * max; }
