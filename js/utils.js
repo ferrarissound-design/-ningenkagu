@@ -1,0 +1,38 @@
+// 汎用ユーティリティ
+
+export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+export const lerp = (a, b, t) => a + (b - a) * t;
+/** フレームレート非依存の補間 */
+export const damp = (a, b, lambda, dt) => lerp(a, b, 1 - Math.exp(-lambda * dt));
+export const randRange = (a, b) => a + Math.random() * (b - a);
+
+/** 角度差を -PI..PI に正規化 */
+export function angleDelta(a, b) {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+/** 点(x,z)から XZ 平面上の矩形までの距離 */
+export function rectDistance(rect, x, z) {
+  const dx = Math.max(rect.minX - x, 0, x - rect.maxX);
+  const dz = Math.max(rect.minZ - z, 0, z - rect.maxZ);
+  return Math.sqrt(dx * dx + dz * dz);
+}
+
+/**
+ * 色の近さ (0 = 同色, 1 = 正反対)。
+ * 人間の目は緑に敏感なので重み付きRGB距離を使う。
+ */
+export function colorDistance(c1, c2) {
+  const dr = c1.r - c2.r;
+  const dg = c1.g - c2.g;
+  const db = c1.b - c2.b;
+  return Math.sqrt((2 * dr * dr + 4 * dg * dg + 3 * db * db) / 9);
+}
+
+/** 擬態の色一致度 0..1 */
+export function colorMatchScore(c1, c2) {
+  return clamp(1 - colorDistance(c1, c2) * 1.9, 0, 1);
+}
