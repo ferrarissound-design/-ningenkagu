@@ -6,6 +6,10 @@ import { Input } from './input.js';
 import { initAudio, setMuted, isMuted } from './audio.js';
 
 const MUTE_KEY = 'ningenkagu.muted';
+const STAGES = [
+  { id: 'living', label: 'STAGE 1　リビング' },
+  { id: 'classroom', label: 'STAGE 2　教室' },
+];
 
 /** 起動できなかった理由を画面に出す（真っ暗なまま放置しない） */
 function showFatal(message) {
@@ -59,7 +63,9 @@ function boot(renderer) {
   scene.add(fill);
 
   const hud = new Hud();
-  const game = new Game(scene, camera, hud);
+  let stageIndex = 0;
+  globalThis.__ningenkaguStage = STAGES[stageIndex].id;
+  let game = new Game(scene, camera, hud);
 
   const input = new Input(renderer.domElement, {
     stickEl: document.getElementById('stick'),
@@ -99,6 +105,7 @@ function boot(renderer) {
   const btnPose = document.getElementById('btnPose');
   const btnPause = document.getElementById('pauseBtn');
   const muteBtn = document.getElementById('muteBtn');
+  const resultNote = document.getElementById('resultNote');
 
   function bindTap(el, fn) {
     if (!el) return;
@@ -121,18 +128,47 @@ function boot(renderer) {
     el.addEventListener('pointerleave', clear);
   }
 
-  function startGame() {
+  /** ステージ切替時に旧ゲームの3Dオブジェクトを scene から外す。 */
+  function removeOldGameWorld(oldGame) {
+    if (!oldGame) return;
+    if (oldGame.stage?.group) scene.remove(oldGame.stage.group);
+    if (oldGame.player?.root) scene.remove(oldGame.player.root);
+    if (oldGame.oni?.root) scene.remove(oldGame.oni.root);
+    if (oldGame.fx?.marker) scene.remove(oldGame.fx.marker);
+    const rings = [...(oldGame.fx?.rings || []), ...(oldGame.fx?.pool || [])];
+    for (const ring of new Set(rings)) scene.remove(ring);
+  }
+
+  function loadStage(index) {
+    stageIndex = Math.max(0, Math.min(STAGES.length - 1, index));
+    removeOldGameWorld(game);
+    globalThis.__ningenkaguStage = STAGES[stageIndex].id;
+    game = new Game(scene, camera, hud);
+    resize();
+    if (window.__ningenkagu) window.__ningenkagu.game = game;
+  }
+
+  function beginCurrentStage() {
     initAudio();
     hud.resetVisuals();
     hud.hideResult();
     titleEl.classList.add('hidden');
     uiEl.classList.add('playing');
     game.start();
+    hud.toast(STAGES[stageIndex].label + '　隠れろ！');
     input.setEnabled(true);
   }
 
-  bindTap(btnStart, startGame);
-  bindTap(btnRetry, startGame);
+  /** リビング勝利時だけ次の教室へ進み、それ以外は現在の面をリトライする。 */
+  function startFromCurrentScreen() {
+    if (game.state === 'win' && stageIndex < STAGES.length - 1) {
+      loadStage(stageIndex + 1);
+    }
+    beginCurrentStage();
+  }
+
+  bindTap(btnStart, beginCurrentStage);
+  bindTap(btnRetry, startFromCurrentScreen);
   bindTap(btnMimic, () => input.pressMimic());
   bindTap(btnPose, () => input.pressPose());
   bindTap(btnPause, () => game.togglePause());
@@ -157,6 +193,15 @@ function boot(renderer) {
     if (shown) {
       input.setEnabled(false);
       uiEl.classList.remove('playing');
+      const hasNext = game.state === 'win' && stageIndex < STAGES.length - 1;
+      if (btnRetry) {
+        btnRetry.textContent = hasNext
+          ? '次のステージへ'
+          : (stageIndex === STAGES.length - 1 && game.state === 'win' ? '教室をもう一度' : 'もう一度遊ぶ');
+      }
+      if (hasNext && resultNote) {
+        resultNote.textContent = 'リビング突破！ 次は机とロッカーだらけの教室。鬼の巡回路も変わる。';
+      }
     }
   };
 
@@ -164,10 +209,9 @@ function boot(renderer) {
   window.addEventListener('keydown', (e) => {
     if (input.enabled || e.repeat) return;
     if (e.code !== 'Enter' && e.code !== 'Space') return;
-    // ボタンにフォーカスがある場合は、ブラウザ標準の click に任せる
     if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
     e.preventDefault();
-    startGame();
+    startFromCurrentScreen();
   });
 
   // スクロール・ピンチズームの抑止
@@ -199,7 +243,7 @@ function boot(renderer) {
   window.addEventListener('blur', () => game.pause());
 
   // デバッグ用に少しだけ公開
-  window.__ningenkagu = { game, input, hud, renderer, THREE };
+  window.__ningenkagu = { game, input, hud, renderer, THREE, stages: STAGES };
 }
 
 const canvas = document.getElementById('scene');
