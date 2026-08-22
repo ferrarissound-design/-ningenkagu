@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ニンゲン家具</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14161c">
+<meta name="description" content="家具に擬態して60秒生き残る3Dステルスゲーム">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🪑</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ゲーム中のUI -->
+  <div id="ui">
+    <div id="hud">
+      <div class="row top">
+        <div class="chip time"><span class="k">残り</span><span id="time">60</span><span class="u">秒</span></div>
+        <div class="chip score"><span class="k">SCORE</span><span id="score">0</span></div>
+        <div class="chip dim" id="riskChip"><span class="k">見落とし</span><span id="risk">x1.0</span></div>
+      </div>
+      <div class="row meters">
+        <div class="meter">
+          <div class="mlabel">
+            <span class="k">擬態</span><b id="mimicName" class="none">なし（生身）</b>
+            <i id="poseOk"></i><span class="pose" id="poseName">直立</span>
+            <span class="pct" id="stealthVal">0%</span>
+          </div>
+          <div class="bar"><div id="stealthBar" class="bad"></div></div>
+        </div>
+        <div class="meter">
+          <div class="mlabel"><span class="k">警戒度</span><b id="alertName" class="safe">安全</b></div>
+          <div class="bar"><div id="alertBar" class="safe"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="popups"></div>
+    <div id="toast"></div>
+
+    <div id="controls">
+      <div id="stick"><div id="knob"></div></div>
+      <div id="btns">
+        <button id="btnPose" class="gbtn" type="button">ポーズ<small>Q</small></button>
+        <button id="btnMimic" class="gbtn primary" type="button">擬態<small>E</small></button>
+      </div>
+    </div>
+
+    <button id="muteBtn" type="button">🔊</button>
+  </div>
+
+  <div id="warn"></div>
+
+  <!-- タイトル -->
+  <div id="title" class="screen">
+    <div class="panel">
+      <h1>ニンゲン家具</h1>
+      <p class="lead">家具に擬態して60秒生き残れ！</p>
+      <button id="btnStart" class="bigbtn" type="button">ゲーム開始</button>
+      <p class="hint">
+        <span>移動 <b>WASD</b> / <b>左スティック</b></span>
+        <span>視点 <b>ドラッグ</b></span>
+        <span>擬態 <b>E</b> / ポーズ <b>Q</b></span>
+      </p>
+    </div>
+  </div>
+
+  <!-- リザルト -->
+  <div id="result" class="screen hidden">
+    <div class="panel">
+      <h2 id="resultTitle" class="win">SURVIVED!</h2>
+      <div class="stats">
+        <div><span>スコア</span><b id="resultScore">0</b></div>
+        <div><span>生存時間</span><b id="resultTime">0.0 秒</b></div>
+        <div><span>ベスト</span><b id="bestScore">0</b></div>
+      </div>
+      <p id="resultNote" class="note"></p>
+      <button id="btnRetry" class="bigbtn" type="button">もう一度遊ぶ</button>
+    </div>
+  </div>
+</div>
+
+<noscript><p style="color:#fff;text-align:center">このゲームには JavaScript が必要です。</p></noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
