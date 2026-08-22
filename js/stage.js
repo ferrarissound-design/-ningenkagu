@@ -20,13 +20,22 @@ export const POSE_FOR_KIND = {
   bin: 'crouch',
 };
 
+/**
+ * main.js が globalThis.__ningenkaguStage に指定したステージを生成する。
+ * 未指定時は従来のリビングを使う。
+ */
 export function buildStage(scene) {
+  const stageId = globalThis.__ningenkaguStage === 'classroom' ? 'classroom' : 'living';
+  return stageId === 'classroom' ? buildClassroom(scene) : buildLivingRoom(scene);
+}
+
+function createBuilder(scene) {
   const group = new THREE.Group();
   scene.add(group);
 
-  const occluders = []; // 視線を遮る物（Raycaster 用）
-  const solids = [];    // 当たり判定の矩形
-  const targets = [];   // 擬態できる物
+  const occluders = [];
+  const solids = [];
+  const targets = [];
 
   function mat(color, rough = 0.85, metal = 0.0) {
     return new THREE.MeshStandardMaterial({
@@ -55,7 +64,7 @@ export function buildStage(scene) {
       mat(color, opts.roughness ?? 0.85, opts.metalness ?? 0)
     );
     m.position.set(x, y, z);
-    m.castShadow = true;
+    m.castShadow = opts.castShadow !== false;
     m.receiveShadow = true;
     group.add(m);
     if (opts.occluder !== false) occluders.push(m);
@@ -68,14 +77,13 @@ export function buildStage(scene) {
       mat(color, opts.roughness ?? 0.9, opts.metalness ?? 0)
     );
     m.position.set(x, y, z);
-    m.castShadow = true;
+    m.castShadow = opts.castShadow !== false;
     m.receiveShadow = true;
     group.add(m);
     if (opts.occluder !== false) occluders.push(m);
     return m;
   }
 
-  /** 当たり判定を追加 */
   function solid(cx, cz, w, d) {
     solids.push({
       minX: cx - w / 2, maxX: cx + w / 2,
@@ -83,54 +91,57 @@ export function buildStage(scene) {
     });
   }
 
-  /** 擬態対象を登録 */
   function target(label, kind, color, cx, cz, w, d, topY, opts = {}) {
     targets.push({
-      label, kind,
+      label,
+      kind,
       color: new THREE.Color(color),
       roughness: opts.roughness ?? 0.85,
       metalness: opts.metalness ?? 0,
-      rect: { minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2 },
+      rect: {
+        minX: cx - w / 2, maxX: cx + w / 2,
+        minZ: cz - d / 2, maxZ: cz + d / 2,
+      },
       center: new THREE.Vector3(cx, topY * 0.5, cz),
       topY,
     });
   }
 
-  // ---- 床 ----
-  const floorW = ROOM.maxX - ROOM.minX;
-  const floorD = ROOM.maxZ - ROOM.minZ;
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(floorW, floorD),
-    mat(0x8a6a45, 0.95)
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  group.add(floor);
+  function addRoomShell(floorColor, wallMain, wallAccent) {
+    const floorW = ROOM.maxX - ROOM.minX;
+    const floorD = ROOM.maxZ - ROOM.minZ;
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorW, floorD), mat(floorColor, 0.95));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    group.add(floor);
 
-  // ラグ（飾り。視線は遮らない）
+    const wallH = ROOM.height;
+    addBox(floorW + WALL_T * 2, wallH, WALL_T, 0, wallH / 2, ROOM.minZ - WALL_T / 2, wallAccent, { castShadow: false });
+    addBox(floorW + WALL_T * 2, wallH, WALL_T, 0, wallH / 2, ROOM.maxZ + WALL_T / 2, wallMain, { castShadow: false });
+    addBox(WALL_T, wallH, floorD, ROOM.minX - WALL_T / 2, wallH / 2, 0, wallMain, { castShadow: false });
+    addBox(WALL_T, wallH, floorD, ROOM.maxX + WALL_T / 2, wallH / 2, 0, wallMain, { castShadow: false });
+
+    target('奥の壁', 'wall', wallAccent, 0, ROOM.minZ, floorW, 0.6, 2.2);
+    target('壁', 'wall', wallMain, 0, ROOM.maxZ, floorW, 0.6, 2.2);
+    target('壁', 'wall', wallMain, ROOM.minX, 0, 0.6, floorD, 2.2);
+    target('壁', 'wall', wallMain, ROOM.maxX, 0, 0.6, floorD, 2.2);
+  }
+
+  return { group, occluders, solids, targets, mat, addBox, addCyl, addSphere, solid, target, addRoomShell };
+}
+
+function buildLivingRoom(scene) {
+  const b = createBuilder(scene);
+  const { group, occluders, solids, targets, mat, addBox, addCyl, addSphere, solid, target, addRoomShell } = b;
+
+  addRoomShell(0x8a6a45, 0xcfc7b6, 0x5f7f8c);
+
   const rug = new THREE.Mesh(new THREE.CircleGeometry(2.2, 24), mat(0x6d5470, 1.0));
   rug.rotation.x = -Math.PI / 2;
   rug.position.set(4.2, 0.012, 0.4);
   rug.receiveShadow = true;
   group.add(rug);
 
-  // ---- 壁 ----
-  const wallH = ROOM.height;
-  const WALL_MAIN = 0xcfc7b6;
-  const WALL_ACCENT = 0x5f7f8c;
-
-  // 奥（-Z）はアクセントカラー
-  addBox(floorW + WALL_T * 2, wallH, WALL_T, 0, wallH / 2, ROOM.minZ - WALL_T / 2, WALL_ACCENT, { castShadow: false });
-  addBox(floorW + WALL_T * 2, wallH, WALL_T, 0, wallH / 2, ROOM.maxZ + WALL_T / 2, WALL_MAIN, { castShadow: false });
-  addBox(WALL_T, wallH, floorD, ROOM.minX - WALL_T / 2, wallH / 2, 0, WALL_MAIN, { castShadow: false });
-  addBox(WALL_T, wallH, floorD, ROOM.maxX + WALL_T / 2, wallH / 2, 0, WALL_MAIN, { castShadow: false });
-
-  target('奥の壁（青灰）', 'wall', WALL_ACCENT, 0, ROOM.minZ, floorW, 0.6, 2.2);
-  target('壁（ベージュ）', 'wall', WALL_MAIN, 0, ROOM.maxZ, floorW, 0.6, 2.2);
-  target('壁（ベージュ）', 'wall', WALL_MAIN, ROOM.minX, 0, 0.6, floorD, 2.2);
-  target('壁（ベージュ）', 'wall', WALL_MAIN, ROOM.maxX, 0, 0.6, floorD, 2.2);
-
-  // ---- テーブル（木） ----
   const TBL = 0x8a5a30;
   addBox(2.4, 0.14, 1.3, -4, 0.78, -2, TBL);
   for (const [lx, lz] of [[-1.05, -0.5], [1.05, -0.5], [-1.05, 0.5], [1.05, 0.5]]) {
@@ -139,7 +150,6 @@ export function buildStage(scene) {
   solid(-4, -2, 2.4, 1.3);
   target('木のテーブル', 'table', TBL, -4, -2, 2.4, 1.3, 0.85);
 
-  // ---- 椅子 ×2 ----
   const CHR = 0x6d4526;
   for (const cz of [-0.55, -3.45]) {
     addBox(0.52, 0.09, 0.52, -4, 0.46, cz, CHR);
@@ -151,7 +161,6 @@ export function buildStage(scene) {
     target('椅子', 'chair', CHR, -4, cz, 0.52, 0.52, 1.08);
   }
 
-  // ---- ソファ（赤） ----
   const SOF = 0xb8443c;
   addBox(2.8, 0.45, 1.1, 4.5, 0.22, 3.2, SOF, { roughness: 0.95 });
   addBox(2.8, 0.62, 0.26, 4.5, 0.62, 3.62, SOF, { roughness: 0.95 });
@@ -160,7 +169,6 @@ export function buildStage(scene) {
   solid(4.5, 3.3, 2.9, 1.3);
   target('赤いソファ', 'sofa', SOF, 4.5, 3.2, 2.8, 1.1, 0.95, { roughness: 0.95 });
 
-  // ---- 観葉植物 ×2 ----
   const POT = 0xb5642f, LEAF = 0x3f8f4a;
   for (const [px, pz] of [[-6.9, 4.7], [6.7, -4.4]]) {
     addCyl(0.34, 0.5, px, 0.25, pz, POT, { taper: 0.75 });
@@ -172,54 +180,47 @@ export function buildStage(scene) {
     target('観葉植物', 'plant', LEAF, px, pz, 0.9, 0.9, 1.85, { roughness: 0.9 });
   }
 
-  // ---- 棚（奥の壁ぎわ） ----
   const SHF = 0x5d4030;
   addBox(0.12, 2.1, 0.5, -0.75, 1.05, -5.2, SHF);
   addBox(0.12, 2.1, 0.5, 1.75, 1.05, -5.2, SHF);
-  for (const by of [0.35, 1.05, 1.75, 2.08]) {
-    addBox(2.62, 0.08, 0.5, 0.5, by, -5.2, SHF);
-  }
+  for (const by of [0.35, 1.05, 1.75, 2.08]) addBox(2.62, 0.08, 0.5, 0.5, by, -5.2, SHF);
   addBox(2.62, 2.1, 0.06, 0.5, 1.05, -5.44, 0x4a3226);
-  // 棚に置かれた小物
   addBox(0.3, 0.3, 0.3, -0.1, 0.54, -5.2, 0xc69a5e);
   addBox(0.25, 0.42, 0.25, 1.2, 1.3, -5.2, 0x8f9bb0);
   solid(0.5, -5.2, 2.7, 0.55);
   target('木の棚', 'shelf', SHF, 0.5, -5.2, 2.7, 0.55, 2.15);
 
-  // ---- キャビネット（背の高い遮蔽物） ----
   const CAB = 0x4a4f57;
   addBox(0.75, 2.0, 1.9, -7.3, 1.0, 0.5, CAB, { roughness: 0.6, metalness: 0.25 });
   addBox(0.06, 0.5, 0.06, -6.9, 1.2, 0.5, 0x9aa3ad, { roughness: 0.4, metalness: 0.6 });
   solid(-7.3, 0.5, 0.8, 1.95);
   target('鉄のキャビネット', 'shelf', CAB, -7.3, 0.5, 0.8, 1.95, 2.05, { roughness: 0.6, metalness: 0.25 });
 
-  // ---- 柱（部屋の真ん中の遮蔽物） ----
   const PIL = 0x9a9a95;
   addBox(0.85, ROOM.height, 0.85, 0.6, ROOM.height / 2, 2.4, PIL, { roughness: 0.95 });
   solid(0.6, 2.4, 0.9, 0.9);
   target('コンクリの柱', 'wall', PIL, 0.6, 2.4, 0.85, 0.85, 2.4, { roughness: 0.95 });
 
-  // ---- ゴミ箱 ----
   const BIN = 0x667487;
   addCyl(0.33, 0.72, 2.3, 0.36, -4.5, BIN, { taper: 0.82, roughness: 0.5, metalness: 0.3 });
   solid(2.3, -4.5, 0.68, 0.68);
   target('ゴミ箱', 'bin', BIN, 2.3, -4.5, 0.7, 0.7, 0.75, { roughness: 0.5, metalness: 0.3 });
 
-  // ---- 段ボール箱 ----
   const BOX1 = 0xc69a5e, BOX2 = 0xa8804a;
-  addBox(0.95, 0.95, 0.95, 1.4, 0.475, 0.9, BOX1);
-  solid(1.4, 0.9, 0.95, 0.95);
-  target('段ボール箱', 'box', BOX1, 1.4, 0.9, 0.95, 0.95, 0.98);
-
-  addBox(0.62, 0.62, 0.62, 2.35, 0.31, 0.2, BOX2);
-  solid(2.35, 0.2, 0.62, 0.62);
-  target('小さい箱', 'box', BOX2, 2.35, 0.2, 0.62, 0.62, 0.65);
-
-  addBox(1.05, 1.35, 1.05, 7.0, 0.675, 1.6, BOX1);
-  solid(7.0, 1.6, 1.05, 1.05);
-  target('大きい箱', 'box', BOX1, 7.0, 1.6, 1.05, 1.05, 1.4);
+  for (const box of [
+    [1.4, 0.9, 0.95, 0.95, 0.95, BOX1, '段ボール箱'],
+    [2.35, 0.2, 0.62, 0.62, 0.62, BOX2, '小さい箱'],
+    [7.0, 1.6, 1.05, 1.35, 1.05, BOX1, '大きい箱'],
+  ]) {
+    const [x, z, w, h, d, color, label] = box;
+    addBox(w, h, d, x, h / 2, z, color);
+    solid(x, z, w, d);
+    target(label, 'box', color, x, z, w, d, h + 0.03);
+  }
 
   return {
+    id: 'living',
+    name: 'リビング',
     group,
     occluders,
     solids,
@@ -235,6 +236,117 @@ export function buildStage(scene) {
       new THREE.Vector3(-6.0, 0, -4.2),
       new THREE.Vector3(2.0, 0, -2.6),
       new THREE.Vector3(3.2, 0, 0.8),
+    ],
+  };
+}
+
+function buildClassroom(scene) {
+  const b = createBuilder(scene);
+  const { group, occluders, solids, targets, addBox, addCyl, solid, target, addRoomShell } = b;
+
+  const FLOOR = 0xb98b57;
+  const WALL = 0xe2dfd2;
+  const FRONT = 0xcdd7d0;
+  addRoomShell(FLOOR, WALL, FRONT);
+
+  // 黒板。奥の壁と同系統だが、より濃い緑で「壁に溶ける」攻略を作る。
+  const BOARD = 0x315b4d;
+  addBox(6.2, 1.45, 0.11, 0, 1.75, ROOM.minZ + 0.12, BOARD, { roughness: 0.95 });
+  addBox(6.55, 0.10, 0.22, 0, 0.98, ROOM.minZ + 0.24, 0x8b6845);
+  target('黒板', 'wall', BOARD, 0, ROOM.minZ + 0.2, 6.2, 0.55, 2.5, { roughness: 0.95 });
+
+  // 教卓。前方に強い遮蔽物を置き、黒板と組み合わせたハイリスク地帯にする。
+  const TEACHER = 0x7a5437;
+  addBox(2.5, 0.18, 0.9, -3.8, 0.86, -4.55, TEACHER);
+  addBox(2.35, 0.75, 0.12, -3.8, 0.44, -4.9, TEACHER);
+  addBox(0.16, 0.78, 0.75, -4.85, 0.39, -4.55, TEACHER);
+  addBox(0.16, 0.78, 0.75, -2.75, 0.39, -4.55, TEACHER);
+  solid(-3.8, -4.55, 2.5, 0.95);
+  target('教卓', 'table', TEACHER, -3.8, -4.55, 2.5, 0.95, 0.95);
+
+  // 生徒机 3列×3。机の列を縫うルートが教室ステージの主役。
+  const DESK = 0xc9955f;
+  const METAL = 0x6f7b83;
+  const CHAIR = 0x5e7a9a;
+  const xs = [-4.4, 0, 4.4];
+  const zs = [-2.1, 0.55, 3.2];
+  for (const x of xs) {
+    for (const z of zs) {
+      addBox(1.35, 0.12, 0.72, x, 0.78, z, DESK);
+      for (const dx of [-0.53, 0.53]) {
+        for (const dz of [-0.25, 0.25]) addBox(0.07, 0.7, 0.07, x + dx, 0.36, z + dz, METAL, { metalness: 0.35, roughness: 0.55 });
+      }
+      solid(x, z, 1.42, 0.82);
+      target('生徒机', 'table', DESK, x, z, 1.35, 0.72, 0.86);
+
+      const cz = z + 0.92;
+      addBox(0.58, 0.10, 0.55, x, 0.48, cz, CHAIR);
+      addBox(0.58, 0.68, 0.10, x, 0.80, cz + 0.22, CHAIR);
+      for (const dx of [-0.21, 0.21]) {
+        for (const dz of [-0.20, 0.20]) addBox(0.06, 0.42, 0.06, x + dx, 0.22, cz + dz, METAL, { metalness: 0.35 });
+      }
+      solid(x, cz, 0.62, 0.62);
+      target('青い椅子', 'chair', CHAIR, x, cz, 0.62, 0.62, 1.14);
+    }
+  }
+
+  // 右壁のロッカー。Tポーズ擬態の強い場所だが、鬼の巡回路にも近い。
+  const LOCKER = 0x8da6a4;
+  for (const z of [-3.6, -1.8, 0, 1.8, 3.6]) {
+    addBox(0.62, 2.15, 1.1, 7.35, 1.075, z, LOCKER, { roughness: 0.55, metalness: 0.18 });
+    addBox(0.04, 0.34, 0.05, 7.02, 1.1, z, 0xd6dddd, { roughness: 0.35, metalness: 0.7 });
+    solid(7.35, z, 0.7, 1.15);
+    target('ロッカー', 'shelf', LOCKER, 7.35, z, 0.7, 1.15, 2.18, { roughness: 0.55, metalness: 0.18 });
+  }
+
+  // 左奥の本棚。黒板と違う濃色なので、色選択を間違えると目立つ。
+  const BOOKSHELF = 0x6a4934;
+  addBox(0.75, 2.25, 2.7, -7.25, 1.125, -2.45, BOOKSHELF);
+  for (const y of [0.55, 1.15, 1.75]) addBox(0.82, 0.07, 2.65, -6.88, y, -2.45, 0x8d684c);
+  for (const [z, color] of [[-3.25, 0xc85f5f], [-2.75, 0x5679b6], [-2.15, 0xe0b34f], [-1.55, 0x6aa46a]]) {
+    addBox(0.2, 0.48, 0.34, -6.82, 1.45, z, color, { occluder: false });
+  }
+  solid(-7.25, -2.45, 0.82, 2.75);
+  target('本棚', 'shelf', BOOKSHELF, -7.25, -2.45, 0.82, 2.75, 2.28);
+
+  // 掃除用具入れとゴミ箱。後方の逃げ込み先。
+  const CLEAN = 0xb7b39b;
+  addBox(0.8, 2.2, 1.5, -7.15, 1.1, 4.45, CLEAN, { roughness: 0.6, metalness: 0.12 });
+  addBox(0.05, 0.42, 0.05, -6.72, 1.1, 4.45, 0x686b67, { metalness: 0.5 });
+  solid(-7.15, 4.45, 0.88, 1.55);
+  target('掃除用具入れ', 'shelf', CLEAN, -7.15, 4.45, 0.88, 1.55, 2.23, { roughness: 0.6, metalness: 0.12 });
+
+  const BIN = 0x4e6b73;
+  addCyl(0.34, 0.72, -5.95, 0.36, 4.85, BIN, { taper: 0.85, roughness: 0.65, metalness: 0.18 });
+  solid(-5.95, 4.85, 0.7, 0.7);
+  target('教室のゴミ箱', 'bin', BIN, -5.95, 4.85, 0.7, 0.7, 0.75, { roughness: 0.65, metalness: 0.18 });
+
+  // 窓は飾り。視線や当たり判定には使わない。
+  for (const z of [-3.5, 0, 3.5]) {
+    addBox(0.08, 1.25, 2.2, ROOM.minX + 0.1, 1.85, z, 0x9bc4d4, { occluder: false, roughness: 0.25, metalness: 0.05 });
+    addBox(0.10, 1.38, 0.08, ROOM.minX + 0.04, 1.85, z, 0xf0f0e8, { occluder: false });
+  }
+
+  return {
+    id: 'classroom',
+    name: '教室',
+    group,
+    occluders,
+    solids,
+    targets,
+    playerSpawn: new THREE.Vector3(-6.15, 0, 5.05),
+    oniSpawn: new THREE.Vector3(5.8, 0, -4.4),
+    // 机の間の通路だけを巡回候補にし、列の読み合いを作る。
+    waypoints: [
+      new THREE.Vector3(2.15, 0, -4.2),
+      new THREE.Vector3(5.85, 0, -2.2),
+      new THREE.Vector3(2.2, 0, -0.8),
+      new THREE.Vector3(2.2, 0, 2.0),
+      new THREE.Vector3(5.75, 0, 4.65),
+      new THREE.Vector3(-2.2, 0, 4.7),
+      new THREE.Vector3(-2.2, 0, 2.0),
+      new THREE.Vector3(-2.2, 0, -0.8),
+      new THREE.Vector3(-5.7, 0, -4.5),
     ],
   };
 }
@@ -256,7 +368,6 @@ export function resolveCollisions(pos, radius, solids) {
     const minX = s.minX - radius, maxX = s.maxX + radius;
     const minZ = s.minZ - radius, maxZ = s.maxZ + radius;
     if (pos.x > minX && pos.x < maxX && pos.z > minZ && pos.z < maxZ) {
-      // 一番浅い方向へ押し出す
       const dl = pos.x - minX, dr = maxX - pos.x;
       const db = pos.z - minZ, df = maxZ - pos.z;
       const m = Math.min(dl, dr, db, df);
