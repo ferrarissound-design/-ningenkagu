@@ -4,6 +4,7 @@ import { Game } from './game.js';
 import { Hud } from './hud.js';
 import { Input } from './input.js';
 import { initAudio, setMuted, isMuted } from './audio.js';
+import { ONI_PERSONALITIES, setForcedOniPersonality, getForcedOniPersonality } from './oni.js';
 
 const MUTE_KEY = 'ningenkagu.muted';
 const STAGE_KEY = 'ningenkagu.stageIndex';
@@ -412,8 +413,15 @@ function boot(renderer) {
   });
   window.addEventListener('blur', () => game.pause());
 
-  // デバッグ用に少しだけ公開
-  window.__ningenkagu = { game, input, hud, renderer, THREE, stages: STAGES };
+  // デバッグ用に少しだけ公開（画面には何も出さない）
+  window.__ningenkagu = {
+    game, input, hud, renderer, THREE, stages: STAGES,
+    // 今の鬼のタイプは __ningenkagu.game.oni.personality で見られる
+    personalities: ONI_PERSONALITIES,
+    // 次のゲームの鬼タイプを固定する。null / 不正な id で通常のランダムへ戻す
+    setOniPersonality: (id) => setForcedOniPersonality(id),
+    getOniPersonality: () => getForcedOniPersonality(),
+  };
 }
 
 const canvas = document.getElementById('scene');

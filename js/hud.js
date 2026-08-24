@@ -226,6 +226,33 @@ export class Hud {
     this._noticeTimer = setTimeout(() => { el.className = ''; }, ms);
   }
 
+  /**
+   * ゲーム開始時に出す「今回の鬼」。
+   * 常設UIは増やさず、既存の notice 枠を3行表示にして使い回す。
+   */
+  personaNotice(icon, name, desc, ms = 2400) {
+    const el = this.elNotice;
+    if (!el) return;
+    const line = (cls, text) => {
+      const s = document.createElement('span');
+      s.className = cls;
+      s.textContent = text;
+      return s;
+    };
+    this.elNoticeText.textContent = '';
+    this.elNoticeText.append(
+      line('pl', '今回の鬼'),
+      line('pn', icon + ' ' + name),
+      line('pd', desc)
+    );
+    el.className = 'show persona';
+    clearTimeout(this._noticeTimer);
+    this._noticeTimer = setTimeout(() => {
+      el.className = '';
+      this.elNoticeText.textContent = '';
+    }, ms);
+  }
+
   hideNotice() {
     clearTimeout(this._noticeTimer);
     if (this.elNotice) this.elNotice.className = '';

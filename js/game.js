@@ -3,7 +3,7 @@ import * as THREE from '../vendor/three/three.module.min.js';
 import { clamp, damp, colorMatchScore } from './utils.js';
 import { buildStage, nearestTarget, resolveCollisions, POSE_FOR_KIND } from './stage.js';
 import { Player, POSE_LABEL } from './player.js';
-import { Oni, STATE } from './oni.js';
+import { Oni, STATE, pickOniPersonality } from './oni.js';
 import { Effects } from './effects.js';
 import { sfx } from './audio.js';
 
@@ -104,10 +104,17 @@ export class Game {
     this.hud.setPaused(false);
   }
 
+  /**
+   * ゲーム開始。鬼の性格タイプはこの瞬間に抽選する。
+   * （タイトル表示中やステージ選択中には変わらない。リトライ・ステージ移行では再抽選される）
+   */
   start() {
+    this.oni.setPersonality(pickOniPersonality());
     this.reset();
     this.state = 'playing';
     this.hud.toast('隠れろ！');
+    const p = this.oni.personality;
+    this.hud.personaNotice(p.icon, p.name, p.desc);
   }
 
   pause() {
@@ -215,10 +222,14 @@ export class Game {
 
     // --- 警戒度 ---
     if (sense.visible) {
-      const distF = clamp(1.7 - sense.dist / 12, 0.35, 1.7);
+      // 見抜く力は性格タイプで変わる。
+      // detectFalloffScale が大きいほど遠くでも警戒度がたまる（見張り鬼）。
+      const tune = this.oni.tune;
+      const distF = clamp(1.7 - sense.dist / (12 * tune.detectFalloffScale), 0.35, 1.7);
       const centerF = 0.4 + 0.6 * sense.centrality;
       const moveF = 1 + 1.5 * clamp(this.player.speed / 3.3, 0, 1);
-      const gain = CONFIG.detectBase * distF * centerF * moveF * (1 - this.mimicry) * sense.fraction;
+      const gain = CONFIG.detectBase * tune.detectScale
+        * distF * centerF * moveF * (1 - this.mimicry) * sense.fraction;
       if (this.oni.state === STATE.INSPECT) {
         // 検査中は目の前で見つめられ続けるので、そのままだと必ず発見されてしまう。
         // 自然な上昇はゆるめて上限どまりにし、代わりに
