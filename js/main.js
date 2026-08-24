@@ -13,6 +13,27 @@ const STAGES = [
   { id: 'artroom', label: 'STAGE 3　美術室', name: '美術室', clearNote: '' },
 ];
 
+// 各ステージの開始直後に「部屋の中が見える」構図を作る。
+// 壁際スポーンのままだとカメラが壁に押されて極端に近くなるため、
+// 開始位置を少しだけ内側へ寄せ、カメラ前方が攻略エリアへ向くようにする。
+const START_VIEWS = {
+  living: {
+    position: [-4.8, 0, -3.2],
+    yaw: -2.20,
+    pitch: 0.48,
+  },
+  classroom: {
+    position: [-2.2, 0, 2.0],
+    yaw: -Math.PI / 4,
+    pitch: 0.48,
+  },
+  artroom: {
+    position: [4.0, 0, -2.4],
+    yaw: 2.15,
+    pitch: 0.48,
+  },
+};
+
 /** 前回クリアまで進んだステージから再開できるようにする */
 function loadSavedStageIndex() {
   try {
@@ -255,6 +276,24 @@ function boot(renderer) {
     if (btnConfig) btnConfig.setAttribute('aria-expanded', String(openCard === 'config'));
   }
 
+  /**
+   * スタート時だけステージ専用の見やすい構図を適用する。
+   * キャラもカメラ前方へ向けておき、最初の一歩が自然に攻略エリアへ入るようにする。
+   */
+  function applyStageStartView() {
+    const cfg = START_VIEWS[STAGES[stageIndex].id];
+    if (!cfg) return;
+
+    game.player.reset(new THREE.Vector3(...cfg.position));
+    game.camYaw = cfg.yaw;
+    game.camPitch = cfg.pitch;
+
+    const forwardYaw = Math.atan2(-Math.sin(game.camYaw), -Math.cos(game.camYaw));
+    game.player.yaw = forwardYaw;
+    game.player.root.rotation.y = forwardYaw;
+    game.updateCamera(0.5, true);
+  }
+
   function beginCurrentStage() {
     initAudio();
     hud.resetVisuals();
@@ -262,6 +301,7 @@ function boot(renderer) {
     // 先にゲーム本体の開始が成功したことを確認してからタイトルを隠す。
     // 起動エラー時に「押したのに真っ暗」になるのを防ぐ。
     game.start();
+    applyStageStartView();
     titleEl.classList.add('hidden');
     appEl.classList.remove('titlemode');
     scene.background = PLAY_BG;
