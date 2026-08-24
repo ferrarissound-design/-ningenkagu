@@ -5,6 +5,7 @@ import { buildStage, nearestTarget, resolveCollisions, POSE_FOR_KIND } from './s
 import { Player, POSE_LABEL } from './player.js';
 import { Oni, STATE, pickOniPersonality } from './oni.js';
 import { Effects } from './effects.js';
+import { StageEventManager } from './stageEvents.js';
 import { sfx } from './audio.js';
 
 export const CONFIG = {
@@ -67,6 +68,9 @@ export class Game {
     this.backdropColor = new THREE.Color(0xcfc7b6);
     this.defaultBackdrop = new THREE.Color(0xcfc7b6);
 
+    // ステージ固有イベント。ステージIDに対応するものが自動で選ばれる
+    this.stageEvent = new StageEventManager(this);
+
     this.reset();
   }
 
@@ -89,6 +93,7 @@ export class Game {
     this.inspectPasses = 0;
     this.player.reset(this.stage.playerSpawn);
     this.oni.reset();
+    this.stageEvent.reset();
     this.camYaw = -Math.PI * 0.75;
     this.camPitch = 0.42;
     this.updateCamera(0.5, true);
@@ -203,6 +208,10 @@ export class Game {
     this.player.update(dt, this._move, speed * inputMag);
     resolveCollisions(this.player.position, this.player.radius, this.stage.solids);
 
+    // --- ステージ固有イベント ---
+    // 鬼の視界補正を先に反映させるため、視界判定より前に進める
+    this.stageEvent.update(dt);
+
     // --- 擬態対象マーカー ---
     const near = nearestTarget(this.stage.targets, this.player.position.x, this.player.position.z, CONFIG.mimicRange);
     if (near) this.fx.showMarker(near.target, this.player.position.x, this.player.position.z);
@@ -228,7 +237,8 @@ export class Game {
       const distF = clamp(1.7 - sense.dist / (12 * tune.detectFalloffScale), 0.35, 1.7);
       const centerF = 0.4 + 0.6 * sense.centrality;
       const moveF = 1 + 1.5 * clamp(this.player.speed / 3.3, 0, 1);
-      const gain = CONFIG.detectBase * tune.detectScale
+      // ステージイベント中は eventDetectScale が下がる（＝気を取られている）
+      const gain = CONFIG.detectBase * tune.detectScale * this.oni.eventDetectScale
         * distF * centerF * moveF * (1 - this.mimicry) * sense.fraction;
       if (this.oni.state === STATE.INSPECT) {
         // 検査中は目の前で見つめられ続けるので、そのままだと必ず発見されてしまう。
@@ -563,6 +573,7 @@ export class Game {
     this.state = 'lose';
     const hint = this.loseHint();
     this.oni.abortInspect();
+    this.stageEvent.abort();
     this.inspecting = false;
     this.hud.hideNotice();
     this.hud.setOniPointer(null);
@@ -578,6 +589,7 @@ export class Game {
     this.state = 'win';
     const hint = this.winHint();
     this.oni.abortInspect();
+    this.stageEvent.abort();
     this.inspecting = false;
     this.hud.hideNotice();
     this.hud.setOniPointer(null);

@@ -5,6 +5,7 @@ import { Hud } from './hud.js';
 import { Input } from './input.js';
 import { initAudio, setMuted, isMuted } from './audio.js';
 import { ONI_PERSONALITIES, setForcedOniPersonality, getForcedOniPersonality } from './oni.js';
+import { STAGE_EVENTS } from './stageEvents.js';
 
 const MUTE_KEY = 'ningenkagu.muted';
 const STAGE_KEY = 'ningenkagu.stageIndex';
@@ -88,7 +89,8 @@ function boot(renderer) {
   const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 100);
 
   // ライト（軽め）
-  scene.add(new THREE.HemisphereLight(0xdfe6ef, 0x3b3126, 1.15));
+  const hemi = new THREE.HemisphereLight(0xdfe6ef, 0x3b3126, 1.15);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff1dd, 1.35);
   sun.position.set(6, 11, 5);
   sun.castShadow = true;
@@ -104,6 +106,13 @@ function boot(renderer) {
   const fill = new THREE.DirectionalLight(0x9fb6d4, 0.45);
   fill.position.set(-7, 6, -6);
   scene.add(fill);
+
+  // 美術室の消灯イベント用。元の明るさを添えて渡し、必ずここへ戻せるようにする
+  scene.userData.stageLights = {
+    hemi: { light: hemi, base: hemi.intensity },
+    sun: { light: sun, base: sun.intensity },
+    fill: { light: fill, base: fill.intensity },
+  };
 
   const hud = new Hud();
   // 保存値は「到達した最高ステージ」。起動時はそこを選んだ状態から始める。
@@ -421,6 +430,11 @@ function boot(renderer) {
     // 次のゲームの鬼タイプを固定する。null / 不正な id で通常のランダムへ戻す
     setOniPersonality: (id) => setForcedOniPersonality(id),
     getOniPersonality: () => getForcedOniPersonality(),
+    // ステージイベントの状態は __ningenkagu.game.stageEvent で見られる
+    stageEvents: STAGE_EVENTS,
+    // 現在ステージのイベントを強制発生させる（プレイ中のみ・通常UIには出さない）
+    triggerStageEvent: () => game.stageEvent.forceStart(),
+    stageEventInfo: () => game.stageEvent.info,
   };
 }
 

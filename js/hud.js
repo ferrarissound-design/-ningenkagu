@@ -253,6 +253,30 @@ export class Hud {
     }, ms);
   }
 
+  /**
+   * ステージイベントの告知。既存の notice 枠を2行表示にして使い回す
+   * （常設UIは増やさない。スマホ縦持ちでも操作を隠さないよう短時間で消える）
+   */
+  eventNotice(title, sub, cls = '', ms = 1900) {
+    const el = this.elNotice;
+    if (!el) return;
+    const line = (c, text) => {
+      const s = document.createElement('span');
+      s.className = c;
+      s.textContent = text;
+      return s;
+    };
+    this.elNoticeText.textContent = '';
+    this.elNoticeText.append(line('et', title));
+    if (sub) this.elNoticeText.append(line('es', sub));
+    el.className = ('show event ' + cls).trim();
+    clearTimeout(this._noticeTimer);
+    this._noticeTimer = setTimeout(() => {
+      el.className = '';
+      this.elNoticeText.textContent = '';
+    }, ms);
+  }
+
   hideNotice() {
     clearTimeout(this._noticeTimer);
     if (this.elNotice) this.elNotice.className = '';

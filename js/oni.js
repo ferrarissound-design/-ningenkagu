@@ -21,7 +21,15 @@ export const MOVE = {
 export const STATE = {
   PATROL: 'patrol', LOOK: 'look', SUSPECT: 'suspect',
   INSPECT: 'inspect', FOUND: 'found',
+  // ステージイベント中の一時的な行動（巡回より優先、FOUND より下）
+  EVENT: 'event',
 };
+
+/**
+ * ステージイベント中でも、これ以上あやしまれたら気を取られていられない。
+ * ＝イベント中に鬼の目の前を走り抜ければ、ちゃんと気づかれる。
+ */
+export const EVENT_BREAK_SUSPICION = 0.7;
 
 /** 家具検査モード（INSPECT）の調整値 */
 export const INSPECT = {
@@ -57,6 +65,11 @@ const DEFAULT_TUNE = {
   sweepRate: 1,            // 首振りの速さ
   furniturePause: 0,       // 家具の前で足を止める確率（0で無効）
   suspectMark: false,      // SUSPECT 中も頭上に「？」を出すか
+  // --- ステージイベント（stageEvents.js）への反応 ---
+  eventMoveScale: 1,       // イベント地点へ向かうときの速さ
+  eventGlance: 0.35,       // イベント中に周囲をちらちら見る強さ（0で一点集中）
+  eventDistract: 1,        // 気の取られやすさ（大きいほど視界ペナルティが強い）
+  eventLinger: 0,          // イベント後、巡回に戻る前に見回す時間の倍率（0でそのまま巡回）
 };
 
 const persona = (id, name, icon, desc, tune) => ({
@@ -77,6 +90,9 @@ export const ONI_PERSONALITIES = {
     detectFalloffScale: 1.50,
     lookTimeScale: 1.30,
     sweepScale: 1.25,
+    // テレビを見ながらも周囲を警戒し続ける＝チャンスタイムが少し短く感じる
+    eventGlance: 0.95,
+    eventDistract: 0.75,
   }),
   // 速いが大雑把。見つかりそうになってから移動する「逃げ」が通る相手。
   charger: persona('charger', '猪突猛進鬼', '💨', '足が速い。でも家具の見分けは少し雑。', {
@@ -92,6 +108,10 @@ export const ONI_PERSONALITIES = {
     lookTimeScale: 0.55,
     sweepScale: 0.85,
     sweepRate: 1.40,
+    // 何かあれば真っ先に飛んでいく。その分うしろががら空きになる
+    eventMoveScale: 1.45,
+    eventGlance: 0.12,
+    eventDistract: 1.15,
   }),
   // すぐ検査に来る。色・ポーズ・静止をきちんと合わせないと耐えられない相手。
   suspicious: persona('suspicious', '疑り深い鬼', '🧐', 'すぐ家具を疑う。擬態の完成度が重要。', {
@@ -106,6 +126,10 @@ export const ONI_PERSONALITIES = {
     lookTimeScale: 1.10,
     furniturePause: 0.50,
     suspectMark: true,
+    // イベントが終わってもすぐには巡回へ戻らず、その場で周囲を確かめる
+    eventGlance: 0.55,
+    eventDistract: 0.9,
+    eventLinger: 1.2,
   }),
 };
 
@@ -282,6 +306,7 @@ export class Oni {
     this.samples = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
     this._eye = new THREE.Vector3();
     this._dir = new THREE.Vector3();
+    this._legGoal = new THREE.Vector3();
 
     this.reset();
   }
@@ -298,13 +323,16 @@ export class Oni {
     this.personality = p;
     this.personalityId = p.id;
     this.tune = p;
-    this.view = {
+    // 性格タイプで決まる素の視界。ステージイベント中はここへさらに倍率が掛かる
+    this.baseView = {
       range: VIEW.range * p.visionRangeScale,
       halfAngle: VIEW.halfAngle * p.visionAngleScale,
       periRange: VIEW.periRange * p.periRangeScale,
       periHalfAngle: VIEW.periHalfAngle,
       eyeHeight: VIEW.eyeHeight,
     };
+    this.eventVision = this.eventVision || { range: 1, angle: 1, peri: 1, detect: 1 };
+    this.refreshView();
     this.moveSpeed = {
       patrol: MOVE.patrol * p.speedScale,
       suspect: MOVE.suspect * p.speedScale,
@@ -315,6 +343,43 @@ export class Oni {
     this.inspectChance = clamp(INSPECT.chance * p.inspectChanceScale, 0.05, 0.85);
     return p;
   }
+
+  /** baseView（性格タイプ）×eventVision（ステージイベント）から実効視界を組み立てる */
+  refreshView() {
+    const b = this.baseView;
+    const e = this.eventVision;
+    this.view = {
+      range: b.range * e.range,
+      halfAngle: b.halfAngle * e.angle,
+      periRange: b.periRange * e.peri,
+      periHalfAngle: b.periHalfAngle,
+      eyeHeight: b.eyeHeight,
+    };
+  }
+
+  /**
+   * ステージイベント中の一時的な視界補正。
+   * 元の視界（性格タイプ）は baseView に残るので、解除すれば必ず元へ戻る。
+   */
+  setEventVision(scales = {}) {
+    this.eventVision = {
+      range: scales.range ?? 1,
+      angle: scales.angle ?? 1,
+      peri: scales.peri ?? 1,
+      detect: scales.detect ?? 1,
+    };
+    this.refreshView();
+    if (this.cone) this.refreshCone();
+  }
+
+  clearEventVision() {
+    if (this.eventVision.range === 1 && this.eventVision.angle === 1
+      && this.eventVision.peri === 1 && this.eventVision.detect === 1) return;
+    this.setEventVision();
+  }
+
+  /** イベント中の「見抜く力」倍率。game.js の警戒度計算が参照する */
+  get eventDetectScale() { return this.eventVision.detect; }
 
   /** ゲーム開始時に呼ぶ。視界コーンの見た目もここで作り直す */
   setPersonality(id) {
@@ -365,6 +430,11 @@ export class Oni {
     this.inspectDoneHold = 0;
     this.inspectCue = null;        // 'start' | 'telegraph' | 'turnback'
     this.inspectFlash = 0;
+
+    // --- ステージイベント ---
+    this.eventFocus = null;        // イベント中に注目している場所
+    this.setEventVision();         // 視界補正を必ず素へ戻す
+
     this.seenX = this.root.position.x;
     this.seenZ = this.root.position.z;
     this.head.rotation.set(0, 0, 0);
@@ -398,16 +468,15 @@ export class Oni {
     this.stuckTimer = 0;
   }
 
-  /** 家具を避けて目的地まで直進できるかを軽量に調べる */
-  canWalkDirectly(target) {
-    const p = this.root.position;
-    const dx = target.x - p.x, dz = target.z - p.z;
+  /** 2点を結ぶ直線が家具に当たらないかを軽量に調べる */
+  segmentClear(ax, az, bx, bz) {
+    const dx = bx - ax, dz = bz - az;
     const dist = Math.hypot(dx, dz);
     const steps = Math.max(1, Math.ceil(dist / 0.18));
     for (let i = 1; i < steps; i++) {
       const t = i / steps;
-      const x = p.x + dx * t;
-      const z = p.z + dz * t;
+      const x = ax + dx * t;
+      const z = az + dz * t;
       for (const s of this.stage.solids) {
         if (
           x > s.minX - PATH_CLEARANCE && x < s.maxX + PATH_CLEARANCE &&
@@ -416,6 +485,25 @@ export class Oni {
       }
     }
     return true;
+  }
+
+  /** 家具を避けて目的地まで直進できるかを軽量に調べる */
+  canWalkDirectly(target) {
+    const p = this.root.position;
+    return this.segmentClear(p.x, p.z, target.x, target.z);
+  }
+
+  /**
+   * 直進、または巡回ポイント1つの経由で目的地まで行けるか。
+   * イベント地点を選ぶときだけ使う（毎フレームは呼ばない）。
+   */
+  canReachEventSpot(target) {
+    if (this.canWalkDirectly(target)) return true;
+    for (const w of this.stage.waypoints) {
+      if (!this.canWalkDirectly(w)) continue;
+      if (this.segmentClear(w.x, w.z, target.x, target.z)) return true;
+    }
+    return false;
   }
 
   /** 現在の視線方向（首振りを含む） */
@@ -527,6 +615,14 @@ export class Oni {
       if (this.state === STATE.INSPECT) {
         // 検査中は自前のシナリオで動く。見えている間だけ位置を更新する
         if (sense.visible) this.lastSeen.set(this.seenX, 0, this.seenZ);
+      } else if (this.state === STATE.EVENT) {
+        // イベントに気を取られていても、派手に動かれれば気づく。
+        // ここを通ると「気を取られている時間」は即終了する＝無敵時間にはしない。
+        if (sense.visible && suspicion >= EVENT_BREAK_SUSPICION) {
+          this.lastSeen.set(sense.px, 0, sense.pz);
+          this.endEventFocus(false);
+          this.enterSuspect();
+        }
       } else if (suspicion >= 0.4 && sense.visible) {
         if (this.state !== STATE.SUSPECT) this.enterSuspect();
         this.lastSeen.set(sense.px, 0, sense.pz);
@@ -542,6 +638,7 @@ export class Oni {
       case STATE.LOOK: this.updateLook(dt); break;
       case STATE.SUSPECT: this.updateSuspect(dt); break;
       case STATE.INSPECT: this.updateInspect(dt); break;
+      case STATE.EVENT: this.updateEventFocus(dt); break;
       case STATE.FOUND: this.updateFound(dt, sense); break;
     }
 
@@ -595,6 +692,7 @@ export class Oni {
     // 視界コーンの色
     const c = this.coneMat.color;
     if (this.state === STATE.FOUND) c.setHex(0xff2d2d);
+    else if (this.state === STATE.EVENT) c.setHex(0x74c7ff);
     else if (this.state === STATE.INSPECT) c.setHex(0xff9020);
     else if (this.state === STATE.SUSPECT) c.setHex(0xff7043);
     else c.setHex(0xffd166);
@@ -665,7 +763,120 @@ export class Oni {
     }
   }
 
+  // ---------------- ステージイベント中の一時行動（EVENT） ----------------
+
+  /**
+   * イベント地点に気を取られる。既存の巡回・移動・衝突処理をそのまま使う。
+   * @returns {boolean} 実際に切り替えたか（FOUND / INSPECT 中は割り込まない）
+   */
+  beginEventFocus(opts) {
+    if (this.state === STATE.FOUND || this.state === STATE.INSPECT) return false;
+    this.eventFocus = {
+      lookX: opts.lookX, lookZ: opts.lookZ,
+      moveX: typeof opts.moveX === 'number' ? opts.moveX : null,
+      moveZ: typeof opts.moveZ === 'number' ? opts.moveZ : null,
+      stand: opts.stand ?? 0.35,
+      moveScale: opts.moveScale ?? 1,
+      glance: opts.glance ?? 0,
+      arrived: false,
+      leg: null,      // 直進できないときに経由する巡回ポイント
+      legTimer: 0,
+      bounces: 0,
+    };
+    this.state = STATE.EVENT;
+    this.inspectPending = false;
+    this.stareTimer = 0;
+    this.stuckTimer = 0;
+    return true;
+  }
+
+  /**
+   * イベントの注目をやめる。
+   * @param {boolean} resume 通常AIへ自分で復帰するか。false なら呼び出し側が次の状態を決める
+   */
+  endEventFocus(resume = true) {
+    this.eventFocus = null;
+    if (this.state !== STATE.EVENT) return;
+    if (!resume) return;
+    const linger = this.tune.eventLinger || 0;
+    // 疑り深い鬼はすぐ巡回に戻らず、その場でぐるりと確認してから動き出す
+    if (linger > 0) this.enterLook(linger);
+    else {
+      this.state = STATE.PATROL;
+      this.pickWaypoint();
+    }
+  }
+
+  /**
+   * イベント地点まで直進できないとき、既存の巡回ポイントを経由点に使う。
+   * 机の列などに阻まれても、途中で立ち往生せず黒板前まで行けるようにする。
+   */
+  pickEventLeg(f, exclude = null) {
+    const p = this.root.position;
+    this._legGoal.set(f.moveX, 0, f.moveZ);
+    if (this.canWalkDirectly(this._legGoal)) { f.leg = null; return; }
+    const here = Math.hypot(f.moveX - p.x, f.moveZ - p.z);
+    let best = null;
+    let bestScore = Infinity;
+    for (const w of this.stage.waypoints) {
+      if (exclude && Math.abs(w.x - exclude.x) < 0.01 && Math.abs(w.z - exclude.z) < 0.01) continue;
+      const toGoal = Math.hypot(w.x - f.moveX, w.z - f.moveZ);
+      if (toGoal >= here - 0.3) continue;          // 目的地に近づかない経由点は使わない
+      if (!this.canWalkDirectly(w)) continue;
+      const score = toGoal + 0.35 * w.distanceTo(p);
+      if (score < bestScore) { bestScore = score; best = w; }
+    }
+    f.leg = best ? { x: best.x, z: best.z } : null;
+  }
+
+  updateEventFocus(dt) {
+    const f = this.eventFocus;
+    if (!f) { this.endEventFocus(true); return; }
+    const p = this.root.position;
+
+    if (f.moveX !== null && !f.arrived) {
+      const d = Math.hypot(f.moveX - p.x, f.moveZ - p.z);
+      if (d <= f.stand + 0.12) {
+        f.arrived = true;
+      } else {
+        f.legTimer -= dt;
+        const legDone = f.leg && Math.hypot(f.leg.x - p.x, f.leg.z - p.z) < 0.6;
+        if (f.legTimer <= 0 || legDone) {
+          this.pickEventLeg(f);
+          f.legTimer = 0.5;
+        }
+        const tx = f.leg ? f.leg.x : f.moveX;
+        const tz = f.leg ? f.leg.z : f.moveZ;
+        this.moveToward(dt, tx, tz, this.moveSpeed.patrol * f.moveScale);
+        // 家具に阻まれたら経由点を選び直す。それでも駄目ならその場から見る
+        if (this.stuckTimer > 0.8) {
+          this.stuckTimer = 0;
+          f.bounces++;
+          this.pickEventLeg(f, f.leg);
+          f.legTimer = 0.5;
+          if (f.bounces >= 3) f.arrived = true;
+        }
+      }
+    } else {
+      this.speed = damp(this.speed, 0, 10, dt);
+    }
+
+    // 到着するまでは進行方向（moveToward が向けた向き）のまま歩き、
+    // 着いてからイベント対象へ向き直る。歩きながら横を向く不自然さを避ける。
+    if (f.arrived || f.moveX === null) {
+      const want = Math.atan2(f.lookX - p.x, f.lookZ - p.z);
+      this.facing += angleDelta(this.facing, want) * Math.min(1, dt * 4.5);
+    }
+
+    // 首は性格タイプしだい。見張り鬼はテレビを見ながらも周囲を気にする
+    const sweep = f.glance > 0.01
+      ? Math.sin(this.idlePhase * 1.5) * 1.0 * f.glance
+      : 0;
+    this.headSweep = damp(this.headSweep, sweep, 2.4 * this.tune.sweepRate, dt);
+  }
+
   giveUp() {
+    this.eventFocus = null;
     this.state = STATE.PATROL;
     this.stareTimer = 0;
     this.inspectPending = false;

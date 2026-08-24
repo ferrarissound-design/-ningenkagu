@@ -289,6 +289,32 @@ html, body {
   #notice.persona { font-size: 17px; padding: 8px 15px; }
 }
 
+/* ステージイベントの告知。notice 枠を2行にして使い回す（常設UIは増やさない） */
+#notice.event {
+  padding: 8px 20px;
+  border-radius: 16px;
+  border-color: #74c7ff;
+  color: #dff0ff;
+  line-height: 1.25;
+}
+#notice.event .et,
+#notice.event .es { display: block; text-align: center; }
+#notice.event .es {
+  font-size: .64em; font-weight: 700;
+  letter-spacing: .01em; color: #b8dcff; opacity: .92;
+  margin-top: 3px;
+}
+/* 「明かりが戻る！」など、急いで止まってほしい予告 */
+#notice.event.alarm {
+  border-color: #ffcf45;
+  color: #ffeab1;
+  animation: noticePulse 0.5s ease-in-out infinite;
+}
+#notice.event.alarm .es { color: #ffd9a0; }
+@media (max-width: 520px) {
+  #notice.event { font-size: 16px; padding: 7px 15px; }
+}
+
 #toast {
   position: absolute; left: 50%; bottom: 27%;
   transform: translateX(-50%) translateY(8px);
