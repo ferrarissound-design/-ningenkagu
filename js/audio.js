@@ -70,6 +70,30 @@ export const sfx = {
     tone(420, 0.16, { type: 'square', gain: 0.08, slideTo: 250 });
     tone(250, 0.2, { type: 'sawtooth', gain: 0.06, delay: 0.1 });
   },
+  // --- ステージイベント ---
+  /** テレビON：短いブラウン管の起動音（ポンッ＋低いハム） */
+  eventTv() {
+    tone(1400, 0.06, { type: 'square', gain: 0.05, slideTo: 2400 });
+    tone(320, 0.22, { type: 'triangle', gain: 0.07, slideTo: 210, delay: 0.05 });
+    tone(120, 0.3, { type: 'sine', gain: 0.05, delay: 0.06 });
+  },
+  /** チャイム：電子ベル風の4音（合成のみ・音源ファイルは使わない） */
+  eventChime() {
+    [659, 523, 587, 392].forEach((f, i) => {
+      tone(f, 0.5, { type: 'sine', gain: 0.11, delay: i * 0.34 });
+      tone(f * 2, 0.34, { type: 'triangle', gain: 0.04, delay: i * 0.34 });
+    });
+  },
+  /** 消灯：電気が落ちる短い音 */
+  eventLightsOut() {
+    tone(520, 0.26, { type: 'sawtooth', gain: 0.09, slideTo: 80 });
+    tone(150, 0.22, { type: 'square', gain: 0.05, delay: 0.04 });
+  },
+  /** 点灯：軽いクリック音 */
+  eventLightsOn() {
+    tone(1700, 0.04, { type: 'square', gain: 0.05 });
+    tone(2300, 0.05, { type: 'square', gain: 0.04, delay: 0.05 });
+  },
   win() {
     [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.28, { type: 'triangle', gain: 0.13, delay: i * 0.11 }));
   },

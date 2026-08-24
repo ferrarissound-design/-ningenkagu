@@ -227,6 +227,20 @@ function buildLivingRoom(scene) {
     target(label, 'box', color, x, z, w, d, h + 0.03);
   }
 
+  // テレビ（右壁ぎわ）。ステージイベント「テレビがついた！」で画面が光る。
+  const TV_BODY = 0x2b2f36;
+  const TV_STAND = 0x6b4b32;
+  addBox(0.72, 0.46, 2.05, 7.56, 0.23, -1.4, TV_STAND);
+  addBox(0.16, 0.95, 1.7, 7.5, 1.12, -1.4, TV_BODY, { roughness: 0.55, metalness: 0.2 });
+  const tvScreen = addBox(0.05, 0.76, 1.46, 7.39, 1.14, -1.4, 0x18202a, {
+    occluder: false, castShadow: false, roughness: 0.35, metalness: 0.1,
+  });
+  // 消えている間は真っ暗。イベント中だけ emissive を上げて「ついた」ことを見せる
+  tvScreen.material.emissive = new THREE.Color(0x000000);
+  tvScreen.material.emissiveIntensity = 1;
+  solid(7.56, -1.4, 0.85, 2.1);
+  target('テレビ', 'shelf', TV_BODY, 7.5, -1.4, 0.8, 1.7, 1.6, { roughness: 0.55, metalness: 0.2 });
+
   return {
     id: 'living',
     name: 'リビング',
@@ -234,6 +248,16 @@ function buildLivingRoom(scene) {
     occluders,
     solids,
     targets,
+    // ステージイベント用の目印（stageEvents.js が参照する）
+    eventRig: {
+      tvScreen,
+      look: new THREE.Vector3(7.3, 1.1, -1.4),
+      spots: [
+        new THREE.Vector3(5.9, 0, -1.4),
+        new THREE.Vector3(5.6, 0, -2.5),
+        new THREE.Vector3(6.1, 0, -0.2),
+      ],
+    },
     playerSpawn: new THREE.Vector3(-6.6, 0, -4.6),
     oniSpawn: new THREE.Vector3(5.0, 0, -2.0),
     waypoints: [
@@ -343,6 +367,19 @@ function buildClassroom(scene) {
     occluders,
     solids,
     targets,
+    // チャイムで鬼が向かう黒板・教卓まわり
+    eventRig: {
+      look: new THREE.Vector3(0, 1.7, ROOM.minZ + 0.2),
+      // 教室のどこからでも「机の列を越えずに前方へ出られる」点を用意する
+      spots: [
+        new THREE.Vector3(0.6, 0, -4.5),
+        new THREE.Vector3(2.2, 0, -4.2),
+        new THREE.Vector3(-1.5, 0, -4.3),
+        new THREE.Vector3(2.2, 0, -3.2),
+        new THREE.Vector3(5.75, 0, -4.3),
+        new THREE.Vector3(-5.7, 0, -3.2),
+      ],
+    },
     playerSpawn: new THREE.Vector3(-2.2, 0, 4.9),
     oniSpawn: new THREE.Vector3(5.8, 0, -4.4),
     // 机の間の通路だけを巡回候補にし、列の読み合いを作る。
@@ -454,6 +491,8 @@ function buildArtRoom(scene) {
     occluders,
     solids,
     targets,
+    // 消灯イベントは鬼を移動させないので、目印は持たない
+    eventRig: {},
     playerSpawn: new THREE.Vector3(6.6, 0, -4.6),
     oniSpawn: new THREE.Vector3(-5.4, 0, 4.8),
     // 石膏像・イーゼル・画材テーブルを避けながら壁沿いを大きく周回する。
