@@ -1,14 +1,21 @@
 // 鬼NPC：巡回・視界・警戒
 import * as THREE from '../vendor/three/three.module.min.js';
-import { clamp, damp, randRange, angleDelta } from './utils.js';
+import { clamp, damp, randRange, angleDelta, rectDistance } from './utils.js';
 import { resolveCollisions } from './stage.js';
 
+/** 視界の基準値。実際の値は性格タイプで倍率を掛けた this.view を使う */
 export const VIEW = {
   range: 14.0,         // 正面視界の距離
   halfAngle: 0.63,     // 約36度
   periRange: 3.4,      // 至近距離の広い視界
   periHalfAngle: 1.5,  // 約86度
   eyeHeight: 1.54,
+};
+
+/** 移動速度の基準値（性格タイプの speedScale が掛かる） */
+export const MOVE = {
+  patrol: 2.15,   // 巡回
+  suspect: 2.60,  // 怪しんで詰め寄る
 };
 
 export const STATE = {
@@ -28,6 +35,99 @@ export const INSPECT = {
   approachSpeed: 1.35,
   flankSpeed: 1.55,
 };
+
+/**
+ * 性格タイプの既定値。すべて「基準値に対する倍率」で、1 なら今までと同じ挙動。
+ * 新しいタイプを足すときは ONI_PERSONALITIES に1行加えて、
+ * 変えたい項目だけ書けばよい（書かなかった項目はここの値になる）。
+ */
+const DEFAULT_TUNE = {
+  speedScale: 1,           // 移動速度（巡回・接近・検査中の動き すべて）
+  visionRangeScale: 1,     // 正面視界の距離
+  visionAngleScale: 1,     // 正面視界の広さ
+  periRangeScale: 1,       // 至近距離視界の距離
+  detectScale: 1,          // 警戒度のたまりやすさ（＝家具と見抜く力）
+  detectFalloffScale: 1,   // 遠距離での見抜く力の落ちにくさ（大きいほど遠くでも強い）
+  inspectChanceScale: 1,   // SUSPECT から INSPECT へ進む確率
+  inspectCooldownScale: 1, // 検査後クールダウン（小さいほど検査が多い）
+  inspectActScale: 1,      // 検査1動作の長さ
+  inspectExtraScale: 1,    // 検査に動作をもう1つ足す確率
+  lookTimeScale: 1,        // 巡回中に立ち止まって見回す時間
+  sweepScale: 1,           // 首振りの大きさ
+  sweepRate: 1,            // 首振りの速さ
+  furniturePause: 0,       // 家具の前で足を止める確率（0で無効）
+  suspectMark: false,      // SUSPECT 中も頭上に「？」を出すか
+};
+
+const persona = (id, name, icon, desc, tune) => ({
+  id, name, icon, desc, ...DEFAULT_TUNE, ...tune,
+});
+
+/**
+ * 鬼の性格タイプ。
+ * 「強さ」ではなく「攻略法」が変わるように、得意の裏に必ず弱点を置く。
+ */
+export const ONI_PERSONALITIES = {
+  // 遠くまで見えるが足が遅い。遮蔽物と擬態の完成度で距離を稼ぐ相手。
+  watcher: persona('watcher', '見張り鬼', '👁', '遠くまでよく見える。動きは少し遅い。', {
+    speedScale: 0.85,
+    visionRangeScale: 1.20,
+    visionAngleScale: 1.14,
+    periRangeScale: 1.10,
+    detectFalloffScale: 1.50,
+    lookTimeScale: 1.30,
+    sweepScale: 1.25,
+  }),
+  // 速いが大雑把。見つかりそうになってから移動する「逃げ」が通る相手。
+  charger: persona('charger', '猪突猛進鬼', '💨', '足が速い。でも家具の見分けは少し雑。', {
+    speedScale: 1.25,
+    visionRangeScale: 0.82,
+    visionAngleScale: 0.94,
+    detectScale: 0.78,
+    detectFalloffScale: 0.85,
+    inspectChanceScale: 0.55,
+    inspectCooldownScale: 1.30,
+    inspectActScale: 0.90,
+    inspectExtraScale: 0.50,
+    lookTimeScale: 0.55,
+    sweepScale: 0.85,
+    sweepRate: 1.40,
+  }),
+  // すぐ検査に来る。色・ポーズ・静止をきちんと合わせないと耐えられない相手。
+  suspicious: persona('suspicious', '疑り深い鬼', '🧐', 'すぐ家具を疑う。擬態の完成度が重要。', {
+    speedScale: 0.88,
+    visionRangeScale: 0.92,
+    visionAngleScale: 0.94,
+    detectScale: 0.95,
+    inspectChanceScale: 1.90,
+    inspectCooldownScale: 0.70,
+    inspectActScale: 1.15,
+    inspectExtraScale: 1.40,
+    lookTimeScale: 1.10,
+    furniturePause: 0.50,
+    suspectMark: true,
+  }),
+};
+
+export const ONI_PERSONALITY_IDS = Object.keys(ONI_PERSONALITIES);
+export const DEFAULT_ONI_PERSONALITY = ONI_PERSONALITY_IDS[0];
+
+// 開発用：次のゲームで使うタイプを固定する（通常プレイでは null）
+let forcedPersonality = null;
+
+/** 開発用。不正な id や null で通常のランダムに戻す。設定した id を返す */
+export function setForcedOniPersonality(id) {
+  forcedPersonality = id && ONI_PERSONALITIES[id] ? id : null;
+  return forcedPersonality;
+}
+
+export function getForcedOniPersonality() { return forcedPersonality; }
+
+/** ゲーム開始の瞬間に呼ぶ。3種類から均等確率で1つ選ぶ */
+export function pickOniPersonality() {
+  if (forcedPersonality) return forcedPersonality;
+  return ONI_PERSONALITY_IDS[Math.floor(Math.random() * ONI_PERSONALITY_IDS.length)];
+}
 
 const ONI_RADIUS = 0.42;
 const PATH_CLEARANCE = ONI_RADIUS;
@@ -56,6 +156,10 @@ export class Oni {
     this.stage = stage;
     this.root = new THREE.Group();
     scene.add(this.root);
+
+    // 性格タイプ由来の値。setPersonality() で作り直す。
+    // コーン生成より前に必要なので、まず既定値で埋めておく。
+    this.applyPersonality(DEFAULT_ONI_PERSONALITY);
 
     const purple = 0x7658c9;
     const purpleLight = 0x9a79df;
@@ -152,7 +256,7 @@ export class Oni {
       blending: THREE.AdditiveBlending,
     });
     this.coneSegments = 26;
-    this.cone = new THREE.Mesh(buildFanGeometry(VIEW.halfAngle, VIEW.range, this.coneSegments), this.coneMat);
+    this.cone = new THREE.Mesh(buildFanGeometry(this.view.halfAngle, this.view.range, this.coneSegments), this.coneMat);
     this.cone.position.y = 0.03;
     this.root.add(this.cone);
 
@@ -172,7 +276,7 @@ export class Oni {
     this.raycaster = new THREE.Raycaster();
     this.coneRay = new THREE.Raycaster();
     this.coneTimer = 0;
-    this.coneDist = new Float32Array(this.coneSegments + 1).fill(VIEW.range);
+    this.coneDist = new Float32Array(this.coneSegments + 1).fill(this.view.range);
     this._coneOrigin = new THREE.Vector3();
     this._coneDir = new THREE.Vector3();
     this.samples = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
@@ -183,6 +287,48 @@ export class Oni {
   }
 
   get position() { return this.root.position; }
+
+  /**
+   * 性格タイプから実際の数値を組み立てる。
+   * 既存の巡回・視界・INSPECT はここで作った値を参照するだけなので、
+   * 仕組み自体は1つのまま「補正だけ」が変わる。
+   */
+  applyPersonality(id) {
+    const p = ONI_PERSONALITIES[id] || ONI_PERSONALITIES[DEFAULT_ONI_PERSONALITY];
+    this.personality = p;
+    this.personalityId = p.id;
+    this.tune = p;
+    this.view = {
+      range: VIEW.range * p.visionRangeScale,
+      halfAngle: VIEW.halfAngle * p.visionAngleScale,
+      periRange: VIEW.periRange * p.periRangeScale,
+      periHalfAngle: VIEW.periHalfAngle,
+      eyeHeight: VIEW.eyeHeight,
+    };
+    this.moveSpeed = {
+      patrol: MOVE.patrol * p.speedScale,
+      suspect: MOVE.suspect * p.speedScale,
+      approach: INSPECT.approachSpeed * p.speedScale,
+      flank: INSPECT.flankSpeed * p.speedScale,
+    };
+    // 既存の INSPECT 設定に倍率を掛けるだけ。極端な 0% / 100% にはしない
+    this.inspectChance = clamp(INSPECT.chance * p.inspectChanceScale, 0.05, 0.85);
+    return p;
+  }
+
+  /** ゲーム開始時に呼ぶ。視界コーンの見た目もここで作り直す */
+  setPersonality(id) {
+    const p = this.applyPersonality(id);
+    if (this.cone) this.refreshCone();
+    return p;
+  }
+
+  /** 視界コーンを今の視界設定でいったん最大まで伸ばし直す */
+  refreshCone() {
+    this.coneDist.fill(this.view.range);
+    this.writeConeGeometry();
+    this.coneTimer = 0;
+  }
 
   reset() {
     this.root.position.copy(this.stage.oniSpawn);
@@ -212,7 +358,8 @@ export class Oni {
     this.inspectWatching = true;   // 今プレイヤーを見ているか（フェイント中は false）
     this.inspectFinished = false;  // 検査完走。game 側の判定待ち
     this.inspectPending = false;   // この SUSPECT は検査に進む予定か
-    this.inspectCooldown = INSPECT.firstDelay;
+    this.inspectCooldown = INSPECT.firstDelay * this.tune.inspectCooldownScale;
+    this.furnitureTimer = 0.8;     // 家具の前で足を止めるかの判定間隔
     this.inspectShort = false;     // 残り時間が少ないときは短縮する
     this.inspectTimeout = 0;
     this.inspectDoneHold = 0;
@@ -275,7 +422,19 @@ export class Oni {
   get lookAngle() { return this.facing + this.headSweep; }
 
   eyePos(out) {
-    return out.set(this.root.position.x, VIEW.eyeHeight, this.root.position.z);
+    return out.set(this.root.position.x, this.view.eyeHeight, this.root.position.z);
+  }
+
+  /** 一番近い「家具」（壁以外の擬態対象）までの距離 */
+  nearestFurnitureDist() {
+    const p = this.root.position;
+    let best = Infinity;
+    for (const t of this.stage.targets) {
+      if (t.kind === 'wall') continue;
+      const d = rectDistance(t.rect, p.x, p.z);
+      if (d < best) best = d;
+    }
+    return best;
   }
 
   /**
@@ -291,8 +450,8 @@ export class Oni {
     if (dist < 0.001) return result;
 
     const ang = Math.abs(angleDelta(this.lookAngle, Math.atan2(dx, dz)));
-    const inMain = ang <= VIEW.halfAngle && dist <= VIEW.range;
-    const inPeri = ang <= VIEW.periHalfAngle && dist <= VIEW.periRange;
+    const inMain = ang <= this.view.halfAngle && dist <= this.view.range;
+    const inPeri = ang <= this.view.periHalfAngle && dist <= this.view.periRange;
     if (!inMain && !inPeri) return result;
     result.peripheral = !inMain;
 
@@ -314,7 +473,7 @@ export class Oni {
 
     result.visible = true;
     result.fraction = unblocked / pts.length;
-    result.centrality = inMain ? clamp(1 - ang / VIEW.halfAngle, 0, 1) * result.fraction : 0.25 * result.fraction;
+    result.centrality = inMain ? clamp(1 - ang / this.view.halfAngle, 0, 1) * result.fraction : 0.25 * result.fraction;
     return result;
   }
 
@@ -324,24 +483,32 @@ export class Oni {
     if (this.coneTimer > 0) return;
     this.coneTimer = 0.12;
     const n = this.coneSegments;
+    const half = this.view.halfAngle;
     const base = this.lookAngle;
     this._coneOrigin.set(this.root.position.x, 1.05, this.root.position.z);
     for (let i = 0; i <= n; i++) {
-      const local = -VIEW.halfAngle + (2 * VIEW.halfAngle * i) / n;
+      const local = -half + (2 * half * i) / n;
       const a = base + local;
       this._coneDir.set(Math.sin(a), 0, Math.cos(a));
       this.coneRay.set(this._coneOrigin, this._coneDir);
       this.coneRay.near = 0.1;
-      this.coneRay.far = VIEW.range;
+      this.coneRay.far = this.view.range;
       const hits = this.coneRay.intersectObjects(occluders, false);
-      this.coneDist[i] = hits.length > 0 ? Math.max(0.4, hits[0].distance - 0.05) : VIEW.range;
+      this.coneDist[i] = hits.length > 0 ? Math.max(0.4, hits[0].distance - 0.05) : this.view.range;
     }
+    this.writeConeGeometry();
+  }
+
+  /** coneDist の内容を扇形メッシュへ書き戻す */
+  writeConeGeometry() {
+    const n = this.coneSegments;
+    const half = this.view.halfAngle;
     const attr = this.cone.geometry.getAttribute('position');
     const arr = attr.array;
     let k = 0;
     for (let i = 0; i < n; i++) {
-      const a0 = -VIEW.halfAngle + (2 * VIEW.halfAngle * i) / n;
-      const a1 = -VIEW.halfAngle + (2 * VIEW.halfAngle * (i + 1)) / n;
+      const a0 = -half + (2 * half * i) / n;
+      const a1 = -half + (2 * half * (i + 1)) / n;
       arr[k++] = 0; arr[k++] = 0; arr[k++] = 0;
       arr[k++] = Math.sin(a0) * this.coneDist[i]; arr[k++] = 0; arr[k++] = Math.cos(a0) * this.coneDist[i];
       arr[k++] = Math.sin(a1) * this.coneDist[i + 1]; arr[k++] = 0; arr[k++] = Math.cos(a1) * this.coneDist[i + 1];
@@ -457,14 +624,30 @@ export class Oni {
     return d;
   }
 
+  /** 立ち止まって見回す。scale で「ちょっとだけ足を止める」も表せる */
+  enterLook(scale = 1) {
+    this.state = STATE.LOOK;
+    this.stateTimer = randRange(1.2, 2.6) * this.tune.lookTimeScale * scale;
+    this.headSweepTarget = (Math.random() < 0.5 ? -1 : 1) * randRange(0.6, 1.15) * this.tune.sweepScale;
+    this.speed = 0;
+  }
+
   updatePatrol(dt) {
     this.headSweep = damp(this.headSweep, 0, 4, dt);
-    const d = this.moveToward(dt, this.target.x, this.target.z, 2.15);
+    const d = this.moveToward(dt, this.target.x, this.target.z, this.moveSpeed.patrol);
     if (d < 0.6 || this.stuckTimer > 1.2) {
-      this.state = STATE.LOOK;
-      this.stateTimer = randRange(1.2, 2.6);
-      this.headSweepTarget = (Math.random() < 0.5 ? -1 : 1) * randRange(0.6, 1.15);
-      this.speed = 0;
+      this.enterLook();
+      return;
+    }
+    // 疑り深い鬼は、通りすがりの家具の前でもつい足を止めて確かめる
+    if (this.tune.furniturePause > 0) {
+      this.furnitureTimer -= dt;
+      if (this.furnitureTimer <= 0) {
+        this.furnitureTimer = 0.7;
+        if (this.nearestFurnitureDist() < 2.0 && Math.random() < this.tune.furniturePause) {
+          this.enterLook(0.7);
+        }
+      }
     }
   }
 
@@ -472,7 +655,7 @@ export class Oni {
     this.speed = damp(this.speed, 0, 10, dt);
     this.stateTimer -= dt;
     // ゆっくり首を振って周囲を見回す
-    this.headSweep = damp(this.headSweep, this.headSweepTarget, 2.2, dt);
+    this.headSweep = damp(this.headSweep, this.headSweepTarget, 2.2 * this.tune.sweepRate, dt);
     if (Math.abs(this.headSweep - this.headSweepTarget) < 0.08) {
       this.headSweepTarget = -this.headSweepTarget;
     }
@@ -489,11 +672,20 @@ export class Oni {
     this.pickWaypoint();
   }
 
-  /** 怪しみ始めた瞬間に「今回は家具検査をするか」をくじ引きする */
+  /**
+   * 怪しみ始めた瞬間に「今回は家具検査をするか」をくじ引きする。
+   * 確率は性格タイプ補正込みの this.inspectChance（疑り深い鬼は高く、猪突猛進鬼は低い）。
+   * クールダウン中は今までどおり抽選しない＝検査は連続しない。
+   */
   enterSuspect() {
     this.state = STATE.SUSPECT;
     this.stareTimer = 0;
-    this.inspectPending = this.inspectCooldown <= 0 && Math.random() < INSPECT.chance;
+    this.inspectPending = this.inspectCooldown <= 0 && Math.random() < this.inspectChance;
+  }
+
+  /** 検査後クールダウン。性格タイプで検査の間隔が変わる */
+  rollInspectCooldown() {
+    return randRange(INSPECT.cooldownMin, INSPECT.cooldownMax) * this.tune.inspectCooldownScale;
   }
 
   updateSuspect(dt) {
@@ -509,7 +701,7 @@ export class Oni {
       return;
     }
     if (dist > 2.4) {
-      this.moveToward(dt, this.lastSeen.x, this.lastSeen.z, 2.6);
+      this.moveToward(dt, this.lastSeen.x, this.lastSeen.z, this.moveSpeed.suspect);
     } else {
       // じっと見つめる
       this.speed = damp(this.speed, 0, 12, dt);
@@ -553,7 +745,8 @@ export class Oni {
 
   beginInspect() {
     const short = !!this.inspectShort;
-    const s = short ? 0.68 : 1;
+    // 短縮率に性格タイプの「検査の丁寧さ」を掛ける（疑り深い鬼は少し長い）
+    const s = (short ? 0.68 : 1) * this.tune.inspectActScale;
     // 必ず「接近して凝視」から入り、そのあとを毎回ランダムに変える
     const rest = ['flank', 'feint', 'peek'];
     for (let i = rest.length - 1; i > 0; i--) {
@@ -561,7 +754,8 @@ export class Oni {
       [rest[i], rest[j]] = [rest[j], rest[i]];
     }
     const kinds = ['approach', rest[0]];
-    if (!short && Math.random() < INSPECT.extraActChance) kinds.push(rest[1]);
+    const extraChance = clamp(INSPECT.extraActChance * this.tune.inspectExtraScale, 0, 0.95);
+    if (!short && Math.random() < extraChance) kinds.push(rest[1]);
 
     this.inspectActs = kinds.map((k) => this.makeInspectAct(k, s));
     this.inspectAct = this.inspectActs.shift();
@@ -595,7 +789,7 @@ export class Oni {
     this.inspectWatching = true;
     this.inspectPending = false;
     this.inspectFlash = 0;
-    this.inspectCooldown = randRange(INSPECT.cooldownMin, INSPECT.cooldownMax);
+    this.inspectCooldown = this.rollInspectCooldown();
     if (this.state === STATE.FOUND) return;
     if (success) {
       this.state = STATE.PATROL;
@@ -619,7 +813,7 @@ export class Oni {
     this.inspectPending = false;
     this.inspectCue = null;
     this.inspectFlash = 0;
-    this.inspectCooldown = randRange(INSPECT.cooldownMin, INSPECT.cooldownMax);
+    this.inspectCooldown = this.rollInspectCooldown();
   }
 
   /** 対象の方をどれだけ速く向くか */
@@ -683,7 +877,7 @@ export class Oni {
     if (d > a.stop + 0.15 && a.e < a.t * 0.7) {
       const tx = this.inspectAnchor.x + (dx / d) * a.stop;
       const tz = this.inspectAnchor.z + (dz / d) * a.stop;
-      this.moveToward(dt, tx, tz, INSPECT.approachSpeed);
+      this.moveToward(dt, tx, tz, this.moveSpeed.approach);
       this.faceAnchor(dt, 5);
       // 家具に阻まれたら無理に詰めず、その場から観察する
       if (this.stuckTimer > 0.8) { a.e = Math.max(a.e, a.t * 0.7); this.stuckTimer = 0; }
@@ -702,7 +896,7 @@ export class Oni {
     const r = clamp(Math.hypot(p.x - ax, p.z - az), 1.5, 2.6);
     // 少し先の点を目標にすると、既存の移動＋衝突判定だけで円弧を描ける
     const lead = before + a.dir * 0.5;
-    this.moveToward(dt, ax + Math.sin(lead) * r, az + Math.cos(lead) * r, INSPECT.flankSpeed);
+    this.moveToward(dt, ax + Math.sin(lead) * r, az + Math.cos(lead) * r, this.moveSpeed.flank);
     // 移動方向ではなく、常に調べている物を見る
     this.faceAnchor(dt, 5);
     a.swept += Math.abs(angleDelta(before, Math.atan2(p.x - ax, p.z - az)));
@@ -766,7 +960,10 @@ export class Oni {
 
   /** 頭上の「？」「！」マーク */
   updateMarks() {
-    const on = this.state === STATE.INSPECT;
+    // 疑り深い鬼は、検査に入る前の「怪しんでいる」段階から「？」を浮かべる
+    const suspecting = this.tune.suspectMark
+      && this.state === STATE.SUSPECT && this.stareTimer > 0.3;
+    const on = this.state === STATE.INSPECT || suspecting;
     const ex = on && this.inspectFlash > 0;
     const q = this.marks.q, e = this.marks.ex;
     if (q.visible !== (on && !ex)) q.visible = on && !ex;

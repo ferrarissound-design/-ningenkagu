@@ -264,6 +264,31 @@ html, body {
   #notice { font-size: 15px; padding: 6px 14px; top: 21%; }
 }
 
+/* 「今回の鬼」表示。開始直後だけ出す3行の一時表示（常設UIは増やさない） */
+#notice.persona {
+  padding: 9px 20px;
+  border-radius: 16px;
+  border-color: #ffd166;
+  color: #ffeccb;
+  line-height: 1.3;
+}
+#notice.persona .pl,
+#notice.persona .pn,
+#notice.persona .pd { display: block; text-align: center; }
+#notice.persona .pl {
+  font-size: .6em; font-weight: 700;
+  letter-spacing: .18em; color: #f3c98d; opacity: .85;
+}
+#notice.persona .pn { font-size: 1.02em; }
+#notice.persona .pd {
+  font-size: .64em; font-weight: 600;
+  letter-spacing: .01em; color: #ffdcae; opacity: .92;
+  margin-top: 2px;
+}
+@media (max-width: 520px) {
+  #notice.persona { font-size: 17px; padding: 8px 15px; }
+}
+
 #toast {
   position: absolute; left: 50%; bottom: 27%;
   transform: translateX(-50%) translateY(8px);
