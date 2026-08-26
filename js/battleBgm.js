@@ -8,20 +8,25 @@ import { isMuted } from './audio.js';
 const TITLE_BGM_URL = new URL('../css/behind_the_potted_plant.mp3', import.meta.url).href;
 const BATTLE_BGM_URL = new URL('../css/gold_medal_morning.mp3', import.meta.url).href;
 
-function makeBgm(url, volume) {
+function makeBgm(url, volume, autoplay = false) {
   const audio = new Audio(url);
   audio.loop = true;
   audio.preload = 'auto';
+  audio.autoplay = autoplay;
   audio.volume = volume;
   audio.setAttribute('playsinline', '');
+  if (autoplay) audio.setAttribute('autoplay', '');
+  audio.load();
   return audio;
 }
 
-const titleBgm = makeBgm(TITLE_BGM_URL, 0.38);
-const battleBgm = makeBgm(BATTLE_BGM_URL, 0.42);
+// タイトル曲はページ読み込み直後からブラウザ標準の autoplay も使って開始を試す。
+const titleBgm = makeBgm(TITLE_BGM_URL, 0.38, true);
+const battleBgm = makeBgm(BATTLE_BGM_URL, 0.42, false);
 
 let lastState = null;
 let lastMuted = null;
+let titleRetryTimer = 0;
 
 function gameState() {
   return globalThis.__ningenkagu?.game?.state ?? 'title';
@@ -30,18 +35,23 @@ function gameState() {
 function playTrack(audio, { restart = false } = {}) {
   if (isMuted()) {
     audio.pause();
-    return;
+    return Promise.resolve(false);
   }
 
   if (restart) {
     try { audio.currentTime = 0; } catch (e) { /* 読み込み前でも続行 */ }
   }
 
-  if (!audio.paused) return;
+  if (!audio.paused) return Promise.resolve(true);
   try {
     const p = audio.play();
-    if (p && typeof p.catch === 'function') p.catch(() => {});
-  } catch (e) { /* BGMが鳴らなくてもゲームは続行 */ }
+    if (p && typeof p.then === 'function') {
+      return p.then(() => true).catch(() => false);
+    }
+    return Promise.resolve(true);
+  } catch (e) {
+    return Promise.resolve(false);
+  }
 }
 
 function pauseTrack(audio) {
@@ -78,22 +88,30 @@ function syncBgm({ restartBattle = false } = {}) {
   lastMuted = muted;
 }
 
-// 自動再生が許可されているブラウザでは、タイトル表示直後から開始する。
-syncBgm();
-
-// iPhone / iPad は「ユーザー操作そのもの」の最中に play() を呼ばないと
-// 音声開始を拒否することがある。main.js のボタン処理は stopPropagation() を使うため、
-// バブリングを待たず capture 段階でタイトルBGMを解錠する。
-function unlockTitleBgm() {
+// ボタン操作を待たず、ページを開いた時点でタイトルBGMの再生を試す。
+// 音源の読み込みが少し遅い端末向けに短時間だけ自動リトライする。
+function startTitleAutomatically() {
   if (gameState() !== 'title' || isMuted() || !titleBgm.paused) return;
   playTrack(titleBgm);
 }
 
-document.addEventListener('pointerdown', unlockTitleBgm, { capture: true, passive: true });
-document.addEventListener('touchstart', unlockTitleBgm, { capture: true, passive: true });
-document.addEventListener('mousedown', unlockTitleBgm, { capture: true, passive: true });
+startTitleAutomatically();
+titleBgm.addEventListener('loadeddata', startTitleAutomatically);
+titleBgm.addEventListener('canplay', startTitleAutomatically);
+window.addEventListener('pageshow', startTitleAutomatically);
+window.addEventListener('focus', startTitleAutomatically);
+document.addEventListener('DOMContentLoaded', startTitleAutomatically);
 
-// ボタンの状態変更後は queueMicrotask で現在の game.state に合わせて曲を切り替える。
+let retries = 0;
+function retryTitleAutoplay() {
+  if (gameState() !== 'title' || isMuted() || !titleBgm.paused || retries >= 12) return;
+  retries++;
+  startTitleAutomatically();
+  titleRetryTimer = window.setTimeout(retryTitleAutoplay, 350);
+}
+titleRetryTimer = window.setTimeout(retryTitleAutoplay, 120);
+
+// ゲーム開始後はタイトル曲を止め、戦闘曲へ切り替える。
 document.addEventListener('click', (event) => {
   const button = event.target.closest?.('button');
   const id = button?.id ?? '';
@@ -105,16 +123,11 @@ document.addEventListener('click', (event) => {
 
   if (id === 'btnResume' || id === 'pauseBtn' || id === 'muteBtn' || id === 'btnSound') {
     queueMicrotask(syncBgm);
-    return;
   }
-
-  if (gameState() === 'title') unlockTitleBgm();
 }, true);
 
-// キーボード操作でも、ユーザー操作中にタイトルBGMの解錠を試す。
 window.addEventListener('keydown', (event) => {
   if (event.repeat) return;
-  if (gameState() === 'title') unlockTitleBgm();
   if (event.code !== 'Escape' && event.code !== 'KeyP' && event.code !== 'Enter' && event.code !== 'Space') return;
   queueMicrotask(() => {
     const state = gameState();
@@ -123,7 +136,10 @@ window.addEventListener('keydown', (event) => {
 }, true);
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) syncBgm();
+  if (!document.hidden) {
+    syncBgm();
+    startTitleAutomatically();
+  }
 });
 window.addEventListener('blur', () => {
   pauseTrack(titleBgm);
