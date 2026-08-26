@@ -70,7 +70,6 @@ function syncBgm({ restartBattle = false } = {}) {
     stopTrack(titleBgm);
     pauseTrack(battleBgm);
   } else {
-    // 勝利・敗北など、かくれんぼが終わった画面では曲を止める。
     stopTrack(titleBgm);
     stopTrack(battleBgm);
   }
@@ -79,55 +78,59 @@ function syncBgm({ restartBattle = false } = {}) {
   lastMuted = muted;
 }
 
-// ブラウザが自動再生を許可している環境では、タイトル表示直後から曲を試す。
-// iPhone / iPad などでブロックされた場合は、タイトル画面で最初に触れた瞬間に再試行する。
+// 自動再生が許可されているブラウザでは、タイトル表示直後から開始する。
 syncBgm();
 
+// iPhone / iPad は「ユーザー操作そのもの」の最中に play() を呼ばないと
+// 音声開始を拒否することがある。main.js のボタン処理は stopPropagation() を使うため、
+// バブリングを待たず capture 段階でタイトルBGMを解錠する。
+function unlockTitleBgm() {
+  if (gameState() !== 'title' || isMuted() || !titleBgm.paused) return;
+  playTrack(titleBgm);
+}
+
+document.addEventListener('pointerdown', unlockTitleBgm, { capture: true, passive: true });
+document.addEventListener('touchstart', unlockTitleBgm, { capture: true, passive: true });
+document.addEventListener('mousedown', unlockTitleBgm, { capture: true, passive: true });
+
+// ボタンの状態変更後は queueMicrotask で現在の game.state に合わせて曲を切り替える。
 document.addEventListener('click', (event) => {
   const button = event.target.closest?.('button');
   const id = button?.id ?? '';
-  const state = gameState();
 
-  // ゲーム開始・リトライでは、タイトル曲を止めて戦闘曲を頭から流す。
-  // main.js 側のボタン処理が先に走るため、この時点では state が playing になっている。
   if (id === 'btnStart' || id === 'btnRetry') {
-    syncBgm({ restartBattle: state === 'playing' });
+    queueMicrotask(() => syncBgm({ restartBattle: gameState() === 'playing' }));
     return;
   }
 
-  // ポーズ・再開・ミュート切替もクリック直後に音へ反映する。
   if (id === 'btnResume' || id === 'pauseBtn' || id === 'muteBtn' || id === 'btnSound') {
-    syncBgm();
+    queueMicrotask(syncBgm);
     return;
   }
 
-  // 「あそびかた」「設定」「ステージ選択」など、タイトル画面での最初の操作で
-  // 自動再生制限が解除されたらタイトルBGMを開始する。
-  if (state === 'title') syncBgm();
-});
+  if (gameState() === 'title') unlockTitleBgm();
+}, true);
 
-// タイトル画面の余白タップでも、iOS の音声再生許可を取りにいく。
-document.addEventListener('pointerup', () => {
-  if (gameState() === 'title' && titleBgm.paused && !isMuted()) playTrack(titleBgm);
-});
-
-// キーボード操作でも開始・再開に追従する。
+// キーボード操作でも、ユーザー操作中にタイトルBGMの解錠を試す。
 window.addEventListener('keydown', (event) => {
   if (event.repeat) return;
+  if (gameState() === 'title') unlockTitleBgm();
   if (event.code !== 'Escape' && event.code !== 'KeyP' && event.code !== 'Enter' && event.code !== 'Space') return;
   queueMicrotask(() => {
     const state = gameState();
     syncBgm({ restartBattle: (event.code === 'Enter' || event.code === 'Space') && state === 'playing' });
   });
-});
+}, true);
 
-document.addEventListener('visibilitychange', syncBgm);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) syncBgm();
+});
 window.addEventListener('blur', () => {
   pauseTrack(titleBgm);
   pauseTrack(battleBgm);
 });
 
-// 勝敗や自動ポーズなど、ゲームループ側で state が変わった場合にも追従する。
+// 勝敗・自動ポーズなどゲームループ側で state が変わった場合にも追従する。
 function frame() {
   const state = gameState();
   const muted = isMuted();
