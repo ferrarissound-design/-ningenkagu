@@ -232,6 +232,8 @@ export class StageEventManager {
     if (g.timeLeft <= EVENT_TIMING.minTimeLeft) return false;
     // 発見・家具検査中は割り込まない（既存の遊びを壊さない）
     if (this.oni.state === STATE.FOUND || this.oni.state === STATE.INSPECT) return false;
+    // プレイヤーの「おとり」など、別の場所からすでに気を引いている最中は重ねない
+    if (this.oni.eventFocus) return false;
     if (g.suspicion >= 0.8) return false;
     return true;
   }

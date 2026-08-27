@@ -48,6 +48,11 @@ export const sfx = {
     tone(120, 0.6, { type: 'square', gain: 0.12 });
   },
   evade() { tone(880, 0.12, { type: 'sine', gain: 0.1 }); tone(1320, 0.18, { type: 'sine', gain: 0.09, delay: 0.09 }); },
+  /** おとり：物を投げて音を立てる、軽いコツンという音 */
+  decoy() {
+    tone(240, 0.09, { type: 'square', gain: 0.09, slideTo: 110 });
+    tone(100, 0.16, { type: 'sine', gain: 0.1, delay: 0.05 });
+  },
   // --- 家具検査モード ---
   /** 検査開始：「んん？」と覗き込む感じの2音 */
   inspect() {

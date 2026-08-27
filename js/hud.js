@@ -53,9 +53,12 @@ export class Hud {
     this.elSbSurvive = $('sbSurvive');
     this.elPause = $('pause');
     this.elOniPtr = $('oniPtr');
+    this.elBtnDecoy = $('btnDecoy');
+    this.elDecoyHint = $('decoyHint');
 
     this._toastTimer = null;
     this._noticeTimer = null;
+    this._lastDecoy = -1;
     this._lastTime = -1;
     this._lastScore = -1;
     this._lastAlertCls = '';
@@ -137,6 +140,14 @@ export class Hud {
     if (!this.elPose || pose === this._lastPose) return;
     this._lastPose = pose;
     this.elPose.textContent = POSE_LABEL[pose] || '';
+  }
+
+  /** 残りおとり回数。0になったらボタンごと無効化する */
+  setDecoy(remaining) {
+    if (remaining === this._lastDecoy) return;
+    this._lastDecoy = remaining;
+    if (this.elDecoyHint) this.elDecoyHint.textContent = 'R ×' + remaining;
+    if (this.elBtnDecoy) this.elBtnDecoy.disabled = remaining <= 0;
   }
 
   setStealth(v) {
