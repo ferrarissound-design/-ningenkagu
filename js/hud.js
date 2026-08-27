@@ -47,6 +47,10 @@ export class Hud {
     this.elResultTime = $('resultTime');
     this.elResultNote = $('resultNote');
     this.elBest = $('bestScore');
+    this.elSbSeen = $('sbSeen');
+    this.elSbEvade = $('sbEvade');
+    this.elSbInspect = $('sbInspect');
+    this.elSbSurvive = $('sbSurvive');
     this.elPause = $('pause');
     this.elOniPtr = $('oniPtr');
 
@@ -289,7 +293,7 @@ export class Hud {
     this._toastTimer = setTimeout(() => this.elToast.classList.remove('show'), 1100);
   }
 
-  showResult(win, score, survived, note) {
+  showResult(win, score, survived, note, breakdown) {
     const isBest = score > this.best;
     if (isBest) {
       this.best = score;
@@ -302,6 +306,11 @@ export class Hud {
     this.elBest.textContent = this.best.toLocaleString('en-US');
     this.elBest.parentElement.classList.toggle('best', isBest && score > 0);
     this.elResultNote.textContent = note || '';
+    const b = breakdown || {};
+    if (this.elSbSeen) this.elSbSeen.textContent = (b.seen || 0).toLocaleString('en-US');
+    if (this.elSbEvade) this.elSbEvade.textContent = (b.evade || 0).toLocaleString('en-US');
+    if (this.elSbInspect) this.elSbInspect.textContent = (b.inspect || 0).toLocaleString('en-US');
+    if (this.elSbSurvive) this.elSbSurvive.textContent = (b.survive || 0).toLocaleString('en-US');
     this.elResult.classList.remove('hidden');
     if (this.onResultChange) this.onResultChange(true);
   }
