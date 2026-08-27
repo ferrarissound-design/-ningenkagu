@@ -99,6 +99,13 @@ export const sfx = {
     tone(1700, 0.04, { type: 'square', gain: 0.05 });
     tone(2300, 0.05, { type: 'square', gain: 0.04, delay: 0.05 });
   },
+  /** 本が崩れる：ドサッという低い音の後、パラパラと数回鳴らす */
+  eventBookfall() {
+    tone(160, 0.22, { type: 'square', gain: 0.1, slideTo: 80 });
+    [0.06, 0.13, 0.19, 0.24].forEach((d, i) => {
+      tone(320 - i * 30, 0.05, { type: 'triangle', gain: 0.05, delay: d });
+    });
+  },
   win() {
     [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.28, { type: 'triangle', gain: 0.13, delay: i * 0.11 }));
   },
