@@ -17,6 +17,48 @@
     touch-action: none !important;
     -webkit-touch-callout: none;
   }
+
+  /*
+   * スマホ幅では style.css が .tl-side を畳むため、
+   * 「あそびかた / 設定」を押したときだけカードを前面に戻す。
+   * main.js が aria-expanded を切り替えるので、追加JSなしで表示を追従できる。
+   */
+  @media (max-width: 860px) {
+    #title:has(#btnHow[aria-expanded="true"]) .tl-side,
+    #title:has(#btnConfig[aria-expanded="true"]) .tl-side {
+      display: block;
+      position: absolute;
+      left: calc(env(safe-area-inset-left, 0px) + 14px);
+      right: calc(env(safe-area-inset-right, 0px) + 14px);
+      top: 44%;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+      width: auto;
+      z-index: 30;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    #title:has(#btnHow[aria-expanded="true"]) .tcard,
+    #title:has(#btnConfig[aria-expanded="true"]) .tcard {
+      max-height: 100%;
+      overflow-y: auto;
+      background: rgba(8, 12, 10, .94);
+      box-shadow: 0 12px 40px rgba(0,0,0,.78), inset 0 0 24px rgba(61,255,110,.06);
+    }
+  }
+
+  /* 横持ちは左のメニューを残し、説明を右側へ出す。 */
+  @media (max-width: 860px) and (orientation: landscape) {
+    #title:has(#btnHow[aria-expanded="true"]) .tl-side,
+    #title:has(#btnConfig[aria-expanded="true"]) .tl-side {
+      left: auto;
+      right: calc(env(safe-area-inset-right, 0px) + 12px);
+      top: calc(env(safe-area-inset-top, 0px) + 38px);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 54px);
+      width: min(52vw, 430px);
+    }
+  }
 </style>
 </head>
 <body>
