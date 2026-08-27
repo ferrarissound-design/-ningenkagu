@@ -18,6 +18,15 @@ export const MOVE = {
   suspect: 2.60,  // 怪しんで詰め寄る
 };
 
+/**
+ * 足音（聴覚）の基準値。視界と違って壁越しでも届くが、距離で急に減衰する。
+ * 「見抜く力」を流用するので、視界の強い性格タイプは耳もよい。
+ */
+export const HEARING = {
+  range: 6.5,      // これを超えると聞こえない（tune.detectFalloffScale が掛かる）
+  alertLevel: 0.55, // これを超える大きさで聞こえると、姿が見えなくても音のした方へ向かう
+};
+
 export const STATE = {
   PATROL: 'patrol', LOOK: 'look', SUSPECT: 'suspect',
   INSPECT: 'inspect', FOUND: 'found',
@@ -565,6 +574,20 @@ export class Oni {
     return result;
   }
 
+  /**
+   * 足音の判定。視界と違って遮蔽物は見ない（壁越しでも聞こえる）が、
+   * 距離だけで急速に減衰する。loudness はプレイヤー側の「どれだけ音を立てているか」(0..1)。
+   */
+  hearTarget(player, loudness) {
+    const p = player.position;
+    if (loudness <= 0) return { level: 0, x: p.x, z: p.z };
+    const dx = p.x - this.root.position.x, dz = p.z - this.root.position.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const range = HEARING.range * this.tune.detectFalloffScale;
+    const falloff = clamp(1 - dist / range, 0, 1);
+    return { level: loudness * falloff * this.tune.detectScale, x: p.x, z: p.z };
+  }
+
   /** 壁や家具で視線が止まるところまでコーンを削る（見た目の分かりやすさ用） */
   updateConeShape(dt, occluders) {
     this.coneTimer -= dt;
@@ -626,6 +649,10 @@ export class Oni {
       } else if (suspicion >= 0.4 && sense.visible) {
         if (this.state !== STATE.SUSPECT) this.enterSuspect();
         this.lastSeen.set(sense.px, 0, sense.pz);
+      } else if (suspicion >= 0.4 && (sense.heard || 0) >= HEARING.alertLevel) {
+        // 姿は見えていないが、足音で位置がバレた＝そこへ向かう
+        if (this.state !== STATE.SUSPECT) this.enterSuspect();
+        this.lastSeen.set(sense.hx, 0, sense.hz);
       } else if (this.state === STATE.SUSPECT && suspicion < 0.12) {
         this.state = STATE.PATROL;
         this.inspectPending = false;

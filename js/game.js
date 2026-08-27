@@ -3,7 +3,7 @@ import * as THREE from '../vendor/three/three.module.min.js';
 import { clamp, damp, colorMatchScore } from './utils.js';
 import { buildStage, nearestTarget, resolveCollisions, POSE_FOR_KIND } from './stage.js';
 import { Player, POSE_LABEL } from './player.js';
-import { Oni, STATE, pickOniPersonality } from './oni.js';
+import { Oni, STATE, HEARING, pickOniPersonality } from './oni.js';
 import { Effects } from './effects.js';
 import { StageEventManager } from './stageEvents.js';
 import { sfx } from './audio.js';
@@ -26,6 +26,12 @@ export const CONFIG = {
   inspectFailPenalty: 0.15, // 検査失敗そのものでは発見まで届かせない
   inspectShortTime: 15,   // 残りがこれ未満なら検査を短縮する
   speed: { stand: 3.3, tpose: 2.6, ypose: 2.6, crouch: 1.7 },
+  // --- 足音（聴覚） ---
+  noise: {
+    speedRef: 3.3,   // この速度で全開（＝直立ダッシュ相当）
+    poseScale: { stand: 1, tpose: 1, ypose: 1, crouch: 0.55 }, // しゃがみは足音そのものも小さい
+    gain: 0.5,       // 警戒度のたまりやすさ（見た目の detectBase と揃える）
+  },
 };
 
 export const ALERT_LEVELS = [
@@ -96,6 +102,7 @@ export class Game {
     this.inspectFail = 0;
     this.inspectSneak = 0;
     this.inspectPasses = 0;
+    this.noiseWarned = false;
     this.player.reset(this.stage.playerSpawn);
     this.oni.reset();
     this.stageEvent.reset();
@@ -270,6 +277,23 @@ export class Game {
       this.hud.setRisk(1, false);
     }
     this.suspicion = clamp(this.suspicion, 0, 1);
+
+    // --- 足音（聴覚） ---
+    // 見えていなくても、近くで大きな音を立てると勘づかれる。
+    // 家具検査・ステージイベント・決着後は既存の仕組みと競合するので対象外。
+    const hearable = this.oni.state === STATE.PATROL || this.oni.state === STATE.LOOK || this.oni.state === STATE.SUSPECT;
+    if (hearable) {
+      const heard = this.oni.hearTarget(this.player, this.noiseLevel());
+      sense.heard = heard.level;
+      sense.hx = heard.x;
+      sense.hz = heard.z;
+      if (heard.level > 0) this.suspicion = clamp(this.suspicion + CONFIG.noise.gain * heard.level * heard.level * dt, 0, 1);
+      if (heard.level >= HEARING.alertLevel) {
+        if (!this.noiseWarned) { this.noiseWarned = true; this.hud.toast('足音が聞こえた…！'); }
+      } else {
+        this.noiseWarned = false;
+      }
+    }
 
     // --- 鬼の更新 ---
     this.oni.inspectShort = this.timeLeft < CONFIG.inspectShortTime;
@@ -464,6 +488,12 @@ export class Game {
     } else {
       this.backdropColor.copy(this.defaultBackdrop);
     }
+  }
+
+  /** 今プレイヤーがどれだけ音を立てているか 0..1（速度とポーズで決まる） */
+  noiseLevel() {
+    const poseScale = CONFIG.noise.poseScale[this.player.pose] ?? 1;
+    return clamp(this.player.speed / CONFIG.noise.speedRef, 0, 1) * poseScale;
   }
 
   /**
