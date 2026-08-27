@@ -77,6 +77,11 @@ export class Game {
   reset() {
     this.timeLeft = CONFIG.timeLimit;
     this.score = 0;
+    // スコア内訳。合計は this.score と一致させ、リザルトで「何が効いたか」を見せる
+    this.scoreSeen = 0;
+    this.scoreEvade = 0;
+    this.scoreInspect = 0;
+    this.scoreSurvive = 0;
     this.suspicion = 0;
     this.mimicry = 0;
     this.risk = 1;
@@ -257,6 +262,7 @@ export class Game {
       this.risk = (1 + 2.5 * closeness) * (1 + 1.0 * sense.centrality) * (1 + 1.2 * clamp(this.suspicion, 0, 1));
       const add = CONFIG.scoreRate * this.risk * sense.fraction * dt;
       this.score += add;
+      this.scoreSeen += add;
       this.hud.setRisk(this.risk, true);
     } else {
       this.suspicion -= CONFIG.suspicionDecay * dt;
@@ -285,6 +291,7 @@ export class Game {
       this.evades++;
       const bonus = CONFIG.evadeBonus * this.evades;
       this.score += bonus;
+      this.scoreEvade += bonus;
       this.hud.popup('見逃された！ +' + bonus, 'good');
       sfx.evade();
     }
@@ -399,6 +406,7 @@ export class Game {
       this.inspectPasses++;
       const bonus = CONFIG.inspectBonus + 200 * (this.inspectPasses - 1);
       this.score += bonus;
+      this.scoreInspect += bonus;
       this.suspicion *= 0.2;
       this.hud.popup('完全に家具だと思われた！ +' + bonus, 'good big');
       sfx.inspectPass();
@@ -582,7 +590,7 @@ export class Game {
     this.player.reactFound();
     this.hud.setWarn(1);
     sfx.found();
-    this.hud.showResult(false, Math.floor(this.score), this.survived, hint);
+    this.hud.showResult(false, Math.floor(this.score), this.survived, hint, this.scoreBreakdown());
   }
 
   win() {
@@ -595,11 +603,22 @@ export class Game {
     this.hud.setOniPointer(null);
     this.timeLeft = 0;
     this.survived = CONFIG.timeLimit;
-    this.score += CONFIG.surviveBonus;
+    this.scoreSurvive = CONFIG.surviveBonus;
+    this.score += this.scoreSurvive;
     this.player.reactWin();
     sfx.win();
     this.hud.setWarn(0);
-    this.hud.showResult(true, Math.floor(this.score), this.survived, hint);
+    this.hud.showResult(true, Math.floor(this.score), this.survived, hint, this.scoreBreakdown());
+  }
+
+  /** リザルト用のスコア内訳（合計は Math.floor(this.score) と一致する） */
+  scoreBreakdown() {
+    return {
+      seen: Math.floor(this.scoreSeen),
+      evade: Math.floor(this.scoreEvade),
+      inspect: Math.floor(this.scoreInspect),
+      survive: Math.floor(this.scoreSurvive),
+    };
   }
 }
 

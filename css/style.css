@@ -460,6 +460,34 @@ html, body {
 }
 .bigbtn.active { transform: scale(.95); filter: brightness(1.15); }
 
+.ghostbtn {
+  pointer-events: auto;
+  -webkit-appearance: none; appearance: none;
+  border: 1px solid rgba(255,255,255,.22);
+  background: transparent;
+  color: rgba(255,255,255,.75);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 9px 22px;
+  margin-top: 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .12s, color .12s, transform .08s;
+  touch-action: none;
+}
+.ghostbtn:hover, .ghostbtn:focus-visible { background: rgba(255,255,255,.08); color: #fff; }
+.ghostbtn.active { transform: scale(.95); }
+
+.scoreBreak {
+  display: flex; justify-content: center; gap: 6px 14px; flex-wrap: wrap;
+  margin: 12px 0 0; padding: 0;
+}
+.scoreBreak > div { display: flex; align-items: baseline; gap: 5px; font-size: 11px; opacity: .8; }
+.scoreBreak dt { margin: 0; opacity: .65; }
+.scoreBreak dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 800; color: #9fe8d2; }
+
 .hint {
   margin: 16px 0 0;
   font-size: 11px; opacity: .6; line-height: 1.9;

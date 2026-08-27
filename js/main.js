@@ -192,6 +192,8 @@ function boot(renderer) {
   const btnStart = document.getElementById('btnStart');
   const btnRetry = document.getElementById('btnRetry');
   const btnResume = document.getElementById('btnResume');
+  const btnPauseTitle = document.getElementById('btnPauseTitle');
+  const btnResultTitle = document.getElementById('btnResultTitle');
   const btnMimic = document.getElementById('btnMimic');
   const btnPose = document.getElementById('btnPose');
   const btnPause = document.getElementById('pauseBtn');
@@ -328,8 +330,25 @@ function boot(renderer) {
     beginCurrentStage();
   }
 
+  /**
+   * ポーズ中・リザルトからタイトルへ戻る。
+   * 現在のステージを選択した状態で作り直し、通常の起動時と同じ画面にする。
+   */
+  function returnToTitle() {
+    input.setEnabled(false);
+    hud.hideResult();
+    hud.setPaused(false);
+    loadStage(stageIndex);
+    titleEl.classList.remove('hidden');
+    appEl.classList.add('titlemode');
+    uiEl.classList.remove('playing');
+    scene.background = TITLE_BG;
+  }
+
   bindTap(btnStart, beginCurrentStage);
   bindTap(btnRetry, startFromCurrentScreen);
+  bindTap(btnPauseTitle, returnToTitle);
+  bindTap(btnResultTitle, returnToTitle);
   bindTap(btnMimic, () => input.pressMimic());
   bindTap(btnPose, () => input.pressPose());
   bindTap(btnPause, () => game.togglePause());

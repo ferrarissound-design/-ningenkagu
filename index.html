@@ -196,6 +196,7 @@
       <p class="note">タイマーも鬼も止まっています。</p>
       <button id="btnResume" class="bigbtn" type="button">再開する</button>
       <p class="hint"><span>再開 <b>Esc</b> / <b>P</b></span></p>
+      <button id="btnPauseTitle" class="ghostbtn" type="button">タイトルへ</button>
     </div>
   </div>
 
@@ -208,8 +209,15 @@
         <div><span>生存時間</span><b id="resultTime">0.0 秒</b></div>
         <div><span>ベスト</span><b id="bestScore">0</b></div>
       </div>
+      <dl class="scoreBreak" id="scoreBreak">
+        <div><dt>見落とし</dt><dd id="sbSeen">0</dd></div>
+        <div><dt>見逃し</dt><dd id="sbEvade">0</dd></div>
+        <div><dt>家具検査</dt><dd id="sbInspect">0</dd></div>
+        <div><dt>生存</dt><dd id="sbSurvive">0</dd></div>
+      </dl>
       <p id="resultNote" class="note"></p>
       <button id="btnRetry" class="bigbtn" type="button">もう一度遊ぶ</button>
+      <button id="btnResultTitle" class="ghostbtn" type="button">タイトルへ</button>
     </div>
   </div>
 
