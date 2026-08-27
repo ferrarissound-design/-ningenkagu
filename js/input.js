@@ -14,6 +14,7 @@ export class Input {
     this.mimicCount = 0;
     this.poseCount = 0;
     this.pauseCount = 0;
+    this.decoyCount = 0;
     this.stick = { x: 0, y: 0 };
     this.enabled = false;
 
@@ -38,6 +39,7 @@ export class Input {
     this.mimicCount = 0;
     this.poseCount = 0;
     this.pauseCount = 0;
+    this.decoyCount = 0;
     this.stick.x = 0; this.stick.y = 0;
     this._stickPointer = null;
     this._lookPointer = null;
@@ -53,6 +55,7 @@ export class Input {
       this.keys.add(e.code);
       if (e.code === 'KeyE' || e.code === 'Enter') this.mimicCount++;
       if (e.code === 'KeyQ' || e.code === 'Space' || e.code === 'ShiftLeft') this.poseCount++;
+      if (e.code === 'KeyR') this.decoyCount++;
       if (e.code === 'Escape' || e.code === 'KeyP') this.pauseCount++;
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
@@ -136,6 +139,7 @@ export class Input {
 
   pressMimic() { if (this.enabled) this.mimicCount++; }
   pressPose() { if (this.enabled) this.poseCount++; }
+  pressDecoy() { if (this.enabled) this.decoyCount++; }
   pressPause() { if (this.enabled) this.pauseCount++; }
 
   /** {x: 右, y: 前} を -1..1 で返す */
@@ -168,6 +172,7 @@ export class Input {
   /** 押された回数を返して0に戻す（フレーム落ち時も取りこぼさない） */
   consumeMimic() { const v = this.mimicCount; this.mimicCount = 0; return v; }
   consumePose() { const v = Math.min(this.poseCount, 4); this.poseCount = 0; return v; }
+  consumeDecoy() { const v = this.decoyCount; this.decoyCount = 0; return v; }
   /** 連打しても1回だけ効かせる（ポーズと再開が同フレームで打ち消し合わない） */
   consumePause() { const v = this.pauseCount > 0; this.pauseCount = 0; return v; }
 
@@ -176,6 +181,7 @@ export class Input {
     this.mimicCount = 0;
     this.poseCount = 0;
     this.pauseCount = 0;
+    this.decoyCount = 0;
     this.lookDX = 0;
     this.lookDY = 0;
   }

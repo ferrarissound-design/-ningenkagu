@@ -1,7 +1,7 @@
 // ゲーム本体（DOMには触らない。UIは hud インターフェース経由）
 import * as THREE from '../vendor/three/three.module.min.js';
-import { clamp, damp, colorMatchScore } from './utils.js';
-import { buildStage, nearestTarget, resolveCollisions, POSE_FOR_KIND } from './stage.js';
+import { clamp, damp, colorMatchScore, randRange } from './utils.js';
+import { buildStage, nearestTarget, resolveCollisions, POSE_FOR_KIND, ROOM } from './stage.js';
 import { Player, POSE_LABEL } from './player.js';
 import { Oni, STATE, HEARING, pickOniPersonality } from './oni.js';
 import { Effects } from './effects.js';
@@ -31,6 +31,15 @@ export const CONFIG = {
     speedRef: 3.3,   // この速度で全開（＝直立ダッシュ相当）
     poseScale: { stand: 1, tpose: 1, ypose: 1, crouch: 0.55 }, // しゃがみは足音そのものも小さい
     gain: 0.5,       // 警戒度のたまりやすさ（見た目の detectBase と揃える）
+  },
+  // --- おとり ---
+  decoy: {
+    maxUses: 2,      // 1ゲームに使える回数
+    cooldown: 6,     // 連発できないように
+    distance: 5.5,   // 今向いている方向、この距離に投げる
+    stand: 0.5,      // 鬼が「到着した」とみなす距離
+    durationMin: 4.5, // これだけ気を取られたら自分で巡回へ戻る
+    durationMax: 6.5,
   },
 };
 
@@ -103,6 +112,10 @@ export class Game {
     this.inspectSneak = 0;
     this.inspectPasses = 0;
     this.noiseWarned = false;
+    this.decoyUses = CONFIG.decoy.maxUses;
+    this.decoyCooldown = 0;
+    this.decoyActive = false;
+    this.decoyTimer = 0;
     this.player.reset(this.stage.playerSpawn);
     this.oni.reset();
     this.stageEvent.reset();
@@ -119,6 +132,7 @@ export class Game {
     this.hud.setWarn(0);
     this.hud.setOniPointer(null);
     this.hud.setPaused(false);
+    this.hud.setDecoy(this.decoyUses);
   }
 
   /**
@@ -198,6 +212,8 @@ export class Game {
       this.twitch(0.06);
     }
     if (input.consumeMimic()) this.tryMimic();
+    if (input.consumeDecoy()) this.tryDecoy();
+    if (this.decoyCooldown > 0) this.decoyCooldown = Math.max(0, this.decoyCooldown - dt);
 
     // --- 移動 ---
     const mv = input.move;
@@ -300,6 +316,7 @@ export class Game {
     this.oni.update(dt, sense, this.suspicion);
     this.oni.updateConeShape(dt, this.stage.occluders);
     this.updateInspect(dt);
+    this.updateDecoy(dt);
 
     // 目の前で見つめられても正体がバレなければ「見逃し」ボーナス
     // （検査ボーナスと二重に出さないよう、検査中はためない）
@@ -442,6 +459,25 @@ export class Game {
     }
   }
 
+  /**
+   * おとりの見張り役。
+   * beginEventFocus はステージイベントと違って自分では終わらないので、
+   * ここで時間切れを見て自分から解除する。高警戒で見つかって
+   * 既に SUSPECT へ抜けていた場合は何もしない（二重に解除しない）。
+   */
+  updateDecoy(dt) {
+    if (!this.decoyActive) return;
+    if (this.oni.state !== STATE.EVENT || !this.oni.eventFocus) {
+      this.decoyActive = false;
+      return;
+    }
+    this.decoyTimer -= dt;
+    if (this.decoyTimer <= 0) {
+      this.oni.endEventFocus(true);
+      this.decoyActive = false;
+    }
+  }
+
   tryMimic() {
     const t = this.nearTarget;
     if (!t) {
@@ -454,6 +490,56 @@ export class Game {
     this.hud.popup(t.label + 'に擬態！', 'good');
     sfx.mimic();
     this.twitch(0.08);
+  }
+
+  /**
+   * おとり：今向いている方向へ物音を投げ、鬼の注意をそこへ引きつける。
+   * 発見済み・家具検査中は割り込めない（ステージイベントと同じ制約を beginEventFocus が持つ）。
+   * 1ゲームに数回だけ使える切り札で、連発はできない。
+   */
+  tryDecoy() {
+    if (this.decoyUses <= 0) {
+      this.hud.toast('おとりはもう使えない');
+      sfx.deny();
+      return;
+    }
+    if (this.decoyCooldown > 0) {
+      this.hud.toast('連続では使えない');
+      sfx.deny();
+      return;
+    }
+    if (this.oni.state === STATE.EVENT) {
+      // ステージイベント中や前のおとりが片付く前は重ねて発動させない
+      this.hud.toast('今は使えない');
+      sfx.deny();
+      return;
+    }
+    const dist = CONFIG.decoy.distance;
+    const s = Math.sin(this.camYaw), c = Math.cos(this.camYaw);
+    const margin = 0.6;
+    const x = clamp(this.player.position.x - s * dist, ROOM.minX + margin, ROOM.maxX - margin);
+    const z = clamp(this.player.position.z - c * dist, ROOM.minZ + margin, ROOM.maxZ - margin);
+
+    const started = this.oni.beginEventFocus({
+      lookX: x, lookZ: z,
+      moveX: x, moveZ: z,
+      stand: CONFIG.decoy.stand,
+      moveScale: this.oni.tune.eventMoveScale ?? 1,
+      glance: this.oni.tune.eventGlance ?? 0.35,
+    });
+    if (!started) {
+      this.hud.toast('今は使えない');
+      sfx.deny();
+      return;
+    }
+    this.decoyUses--;
+    this.decoyCooldown = CONFIG.decoy.cooldown;
+    this.decoyActive = true;
+    this.decoyTimer = randRange(CONFIG.decoy.durationMin, CONFIG.decoy.durationMax);
+    this.hud.setDecoy(this.decoyUses);
+    this.fx.burst({ x, z }, new THREE.Color(0xffcf6b));
+    this.hud.popup('おとりを投げた！', 'good');
+    sfx.decoy();
   }
 
   isPoseMatched() {
