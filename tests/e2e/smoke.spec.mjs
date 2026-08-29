@@ -197,3 +197,48 @@ test.describe('BGMの状態追従', () => {
     expect(t).toBeLessThan(1.0);
   });
 });
+
+test.describe('モバイルのタイトルカード', () => {
+  // css/style.css の html.title-card-open 系ルールと js/main.js の
+  // touchmove スコープが噛み合って初めて、カード内が実際にスクロールできる。
+  // どちらか片方でも壊れると「開くが操作できないカード」に戻ってしまう回帰なので、
+  // 見た目のクラス確認だけでなく、実際のタッチスワイプで検証する。
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('あそびかたカードを開いて閉じられ、カード内は実際にタッチスクロールできる', async ({ page, context }) => {
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    await expect(page.locator('.tl-side')).toBeHidden();
+
+    await page.click('#btnHow');
+    await expect(page.locator('html')).toHaveClass(/title-card-open/);
+    await expect(page.locator('#cardHow')).toBeVisible();
+    const closeBtn = page.locator('#cardHow .titleCardClose');
+    await expect(closeBtn).toBeVisible();
+
+    const card = await page.locator('#cardHow').elementHandle();
+    const box = await card.boundingBox();
+
+    // 実際のタッチスワイプ（下から上へドラッグ）でスクロールさせる。
+    // ゲーム全体の touchmove 抑止（main.js）に巻き込まれていれば scrollTop は動かない。
+    const cdp = await context.newCDPSession(page);
+    const cx = box.x + box.width / 2;
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: cx, y: box.y + box.height - 40 }],
+    });
+    for (let y = box.height - 40; y > 40; y -= 40) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx, y: box.y + y }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForTimeout(150);
+
+    const scrollTop = await page.evaluate((el) => el.scrollTop, card);
+    expect(scrollTop).toBeGreaterThan(0);
+
+    await closeBtn.click();
+    await expect(page.locator('html')).not.toHaveClass(/title-card-open/);
+    await expect(page.locator('#btnHow')).toHaveAttribute('aria-expanded', 'false');
+  });
+});

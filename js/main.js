@@ -404,8 +404,13 @@ function boot(renderer) {
     startFromCurrentScreen();
   });
 
-  // スクロール・ピンチズームの抑止
-  document.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
+  // スクロール・ピンチズームの抑止。
+  // タイトルの「あそびかた / 設定」カード内はネイティブの縦スクロールに任せる
+  // （そちらは css/style.css 側で touch-action: pan-y を許可している）。
+  document.addEventListener('touchmove', (e) => {
+    if (e.target.closest('.tcard')) return;
+    e.preventDefault();
+  }, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('dblclick', (e) => e.preventDefault());
