@@ -744,6 +744,11 @@ html.title-card-open #title .tcard {
 @media (prefers-reduced-motion: reduce) {
   #tlFx .hue { animation: none; }
   .lrow { animation: none; }
+  /* 点滅・パルス系はすべて静止させる。色や不透明度そのものによる警告表示は残す */
+  .chip.time #time.urgent { animation: none; }
+  #warn.pulse { animation: none; }
+  #notice.inspect,
+  #notice.event.alarm { animation: none; }
 }
 
 /* 低い画面（横持ちスマホ）向けの調整 */
