@@ -3,7 +3,11 @@
 // playing = gold_medal_morning
 // paused  = 戦闘BGMを一時停止
 // win/lose = 全BGM停止
-import { isMuted } from './audio.js';
+//
+// 状態はゲーム本体（gameState）と音設定（audio）の通知を購読して受け取る。
+// ボタンの id やキーコードは一切見ないので、UI を作り替えても壊れない。
+import { isMuted, onMuteChange } from './audio.js';
+import { getGameState, onGameState } from './gameState.js';
 import './titleMenu.js';
 
 const TITLE_BGM_URL = new URL('../css/behind_the_potted_plant.mp3', import.meta.url).href;
@@ -24,14 +28,6 @@ function makeBgm(url, volume, autoplay = false) {
 // タイトル曲はページ読み込み直後からブラウザ標準の autoplay も使って開始を試す。
 const titleBgm = makeBgm(TITLE_BGM_URL, 0.38, true);
 const battleBgm = makeBgm(BATTLE_BGM_URL, 0.42, false);
-
-let lastState = null;
-let lastMuted = null;
-let titleRetryTimer = 0;
-
-function gameState() {
-  return globalThis.__ningenkagu?.game?.state ?? 'title';
-}
 
 function playTrack(audio, { restart = false } = {}) {
   if (isMuted()) {
@@ -65,10 +61,9 @@ function stopTrack(audio) {
 }
 
 function syncBgm({ restartBattle = false } = {}) {
-  const state = gameState();
-  const muted = isMuted();
+  const state = getGameState();
 
-  if (muted) {
+  if (isMuted()) {
     pauseTrack(titleBgm);
     pauseTrack(battleBgm);
   } else if (state === 'title') {
@@ -84,19 +79,22 @@ function syncBgm({ restartBattle = false } = {}) {
     stopTrack(titleBgm);
     stopTrack(battleBgm);
   }
-
-  lastState = state;
-  lastMuted = muted;
 }
+
+// ポーズからの再開は曲の続きから。それ以外（開始・リトライ・次のステージ）は頭出しする。
+onGameState((state, prev) => {
+  syncBgm({ restartBattle: state === 'playing' && prev !== 'paused' });
+});
+
+onMuteChange(() => syncBgm());
 
 // ボタン操作を待たず、ページを開いた時点でタイトルBGMの再生を試す。
 // 音源の読み込みが少し遅い端末向けに短時間だけ自動リトライする。
 function startTitleAutomatically() {
-  if (gameState() !== 'title' || isMuted() || !titleBgm.paused) return;
+  if (getGameState() !== 'title' || isMuted() || !titleBgm.paused) return;
   playTrack(titleBgm);
 }
 
-startTitleAutomatically();
 titleBgm.addEventListener('loadeddata', startTitleAutomatically);
 titleBgm.addEventListener('canplay', startTitleAutomatically);
 window.addEventListener('pageshow', startTitleAutomatically);
@@ -105,36 +103,12 @@ document.addEventListener('DOMContentLoaded', startTitleAutomatically);
 
 let retries = 0;
 function retryTitleAutoplay() {
-  if (gameState() !== 'title' || isMuted() || !titleBgm.paused || retries >= 12) return;
+  if (getGameState() !== 'title' || isMuted() || !titleBgm.paused || retries >= 12) return;
   retries++;
   startTitleAutomatically();
-  titleRetryTimer = window.setTimeout(retryTitleAutoplay, 350);
+  window.setTimeout(retryTitleAutoplay, 350);
 }
-titleRetryTimer = window.setTimeout(retryTitleAutoplay, 120);
-
-// ゲーム開始後はタイトル曲を止め、戦闘曲へ切り替える。
-document.addEventListener('click', (event) => {
-  const button = event.target.closest?.('button');
-  const id = button?.id ?? '';
-
-  if (id === 'btnStart' || id === 'btnRetry') {
-    queueMicrotask(() => syncBgm({ restartBattle: gameState() === 'playing' }));
-    return;
-  }
-
-  if (id === 'btnResume' || id === 'pauseBtn' || id === 'muteBtn' || id === 'btnSound') {
-    queueMicrotask(syncBgm);
-  }
-}, true);
-
-window.addEventListener('keydown', (event) => {
-  if (event.repeat) return;
-  if (event.code !== 'Escape' && event.code !== 'KeyP' && event.code !== 'Enter' && event.code !== 'Space') return;
-  queueMicrotask(() => {
-    const state = gameState();
-    syncBgm({ restartBattle: (event.code === 'Enter' || event.code === 'Space') && state === 'playing' });
-  });
-}, true);
+window.setTimeout(retryTitleAutoplay, 120);
 
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
@@ -142,16 +116,13 @@ document.addEventListener('visibilitychange', () => {
     startTitleAutomatically();
   }
 });
+
+// タブを離れたときは、ゲームが自動ポーズされない画面（タイトル等）でも曲を止める。
 window.addEventListener('blur', () => {
   pauseTrack(titleBgm);
   pauseTrack(battleBgm);
 });
 
-// 勝敗・自動ポーズなどゲームループ側で state が変わった場合にも追従する。
-function frame() {
-  const state = gameState();
-  const muted = isMuted();
-  if (state !== lastState || muted !== lastMuted) syncBgm();
-  requestAnimationFrame(frame);
-}
-requestAnimationFrame(frame);
+// main.js が保存済みの音設定を反映したあとに読み込まれるので、ここで初期同期する。
+syncBgm();
+startTitleAutomatically();

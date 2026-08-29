@@ -1,12 +1,13 @@
 // ゲーム本体（DOMには触らない。UIは hud インターフェース経由）
 import * as THREE from '../vendor/three/three.module.min.js';
 import { clamp, damp, colorMatchScore, randRange } from './utils.js';
-import { buildStage, nearestTarget, resolveCollisions, POSE_FOR_KIND, ROOM } from './stage.js';
+import { buildStage, disposeStage, nearestTarget, resolveCollisions, POSE_FOR_KIND, ROOM } from './stage.js';
 import { Player, POSE_LABEL } from './player.js';
 import { Oni, STATE, HEARING, pickOniPersonality } from './oni.js';
 import { Effects } from './effects.js';
 import { StageEventManager } from './stageEvents.js';
 import { sfx } from './audio.js';
+import { setGameState } from './gameState.js';
 
 export const CONFIG = {
   timeLimit: 60,
@@ -67,7 +68,7 @@ export class Game {
     this.oni = new Oni(scene, this.stage);
     this.fx = new Effects(scene);
 
-    this.state = 'title';
+    this.setState('title');
     this.camYaw = 0;
     this.camPitch = 0.42;
     this.camDist = 5.4;
@@ -136,13 +137,36 @@ export class Game {
   }
 
   /**
+   * 状態の変更はすべてここを通す。
+   * BGM のような外側の担当は gameState の通知だけを見ればよくなる。
+   */
+  setState(next) {
+    if (this.state === next) return;
+    this.state = next;
+    setGameState(next);
+  }
+
+  /**
+   * この Game を捨てるときに呼ぶ（ステージ切替・タイトル復帰）。
+   * scene から外すだけでは GPU リソースが残るので、必ず経由させる。
+   */
+  dispose() {
+    // 明るさやテレビの演出を元に戻してから、その3Dオブジェクトを解放する
+    this.stageEvent.abort();
+    disposeStage(this.stage);
+    this.player.dispose();
+    this.oni.dispose();
+    this.fx.dispose();
+  }
+
+  /**
    * ゲーム開始。鬼の性格タイプはこの瞬間に抽選する。
    * （タイトル表示中やステージ選択中には変わらない。リトライ・ステージ移行では再抽選される）
    */
   start() {
     this.oni.setPersonality(pickOniPersonality());
     this.reset();
-    this.state = 'playing';
+    this.setState('playing');
     this.hud.toast('隠れろ！');
     const p = this.oni.personality;
     this.hud.personaNotice(p.icon, p.name, p.desc);
@@ -150,13 +174,13 @@ export class Game {
 
   pause() {
     if (this.state !== 'playing') return;
-    this.state = 'paused';
+    this.setState('paused');
     this.hud.setPaused(true);
   }
 
   resume() {
     if (this.state !== 'paused') return;
-    this.state = 'playing';
+    this.setState('playing');
     this.hud.setPaused(false);
   }
 
@@ -694,7 +718,7 @@ export class Game {
   }
 
   lose() {
-    this.state = 'lose';
+    this.setState('lose');
     const hint = this.loseHint();
     this.oni.abortInspect();
     this.stageEvent.abort();
@@ -710,7 +734,7 @@ export class Game {
   }
 
   win() {
-    this.state = 'win';
+    this.setState('win');
     const hint = this.winHint();
     this.oni.abortInspect();
     this.stageEvent.abort();

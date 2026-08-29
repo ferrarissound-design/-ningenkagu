@@ -1,5 +1,6 @@
 // 軽量な演出（外部アセット不要）
 import * as THREE from '../vendor/three/three.module.min.js';
+import { disposeObject3D } from './utils.js';
 
 export class Effects {
   constructor(scene) {
@@ -72,5 +73,13 @@ export class Effects {
       this.markerMat.opacity = 0.38 + Math.sin(this.markerPhase) * 0.18;
       this.marker.rotation.z += dt * 1.2;
     }
+  }
+
+  /** マーカーと、使用中・待機中の両方のリングを解放する */
+  dispose() {
+    disposeObject3D(this.marker);
+    for (const ring of new Set([...this.rings, ...this.pool])) disposeObject3D(ring);
+    this.rings.length = 0;
+    this.pool.length = 0;
   }
 }

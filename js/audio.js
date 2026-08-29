@@ -16,8 +16,32 @@ export function initAudio() {
   }
 }
 
-export function setMuted(v) { muted = v; }
+const muteListeners = new Set();
+
+export function setMuted(v) {
+  const next = !!v;
+  if (next === muted) return;
+  muted = next;
+  for (const fn of [...muteListeners]) {
+    try {
+      fn(muted);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+}
+
 export function isMuted() { return muted; }
+
+/**
+ * 音のオン / オフ切替を購読する。
+ * BGM のように audio.js の外で鳴らしているものが追従するために使う。
+ * 戻り値を呼ぶと購読を解除できる。
+ */
+export function onMuteChange(fn) {
+  muteListeners.add(fn);
+  return () => muteListeners.delete(fn);
+}
 
 function tone(freq, dur, { type = 'sine', gain = 0.16, slideTo = null, delay = 0 } = {}) {
   if (!ctx || muted) return;

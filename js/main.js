@@ -237,17 +237,6 @@ function boot(renderer) {
     el.addEventListener('touchend', clear, { passive: true });
   }
 
-  /** ステージ切替時に旧ゲームの3Dオブジェクトを scene から外す。 */
-  function removeOldGameWorld(oldGame) {
-    if (!oldGame) return;
-    if (oldGame.stage?.group) scene.remove(oldGame.stage.group);
-    if (oldGame.player?.root) scene.remove(oldGame.player.root);
-    if (oldGame.oni?.root) scene.remove(oldGame.oni.root);
-    if (oldGame.fx?.marker) scene.remove(oldGame.fx.marker);
-    const rings = [...(oldGame.fx?.rings || []), ...(oldGame.fx?.pool || [])];
-    for (const ring of new Set(rings)) scene.remove(ring);
-  }
-
   /** ステージ選択チップと情報カードの表示を、今の選択・解放状態に合わせる。 */
   function syncStageUi() {
     for (const btn of stageBtns) {
@@ -268,7 +257,9 @@ function boot(renderer) {
     // 解放状態は最高到達点で保存する。下の面を選び直しても巻き戻さない。
     unlockedMax = Math.max(unlockedMax, stageIndex);
     saveStageIndex(unlockedMax);
-    removeOldGameWorld(game);
+    // 旧ステージは scene から外すだけでなく GPU リソースまで解放する。
+    // ここを飛ばすと、ステージを切り替えるたびに部屋一式がメモリに残る。
+    game?.dispose();
     globalThis.__ningenkaguStage = STAGES[stageIndex].id;
     hud.setStage(STAGES[stageIndex].id);
     game = new Game(scene, camera, hud);

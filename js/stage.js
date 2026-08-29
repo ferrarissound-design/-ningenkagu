@@ -1,6 +1,6 @@
 // ステージ（部屋と家具）の生成
 import * as THREE from '../vendor/three/three.module.min.js';
-import { rectDistance } from './utils.js';
+import { rectDistance, disposeObject3D } from './utils.js';
 
 export const ROOM = { minX: -8, maxX: 8, minZ: -6, maxZ: 6, height: 3.2 };
 const WALL_T = 0.3;
@@ -509,6 +509,11 @@ function buildArtRoom(scene) {
       new THREE.Vector3(-5.2, 0, -1.0),
     ],
   };
+}
+
+/** ステージが確保した GPU リソースを解放する。作り直す前に必ず呼ぶ。 */
+export function disposeStage(stage) {
+  if (stage) disposeObject3D(stage.group);
 }
 
 /** (x,z) に最も近い擬態対象を返す */
