@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from '../../vendor/three/three.module.min.js';
 import {
   clamp, lerp, damp, angleDelta, rectDistance, colorDistance, colorMatchScore,
-  prefersReducedMotion,
+  prefersReducedMotion, applyDeadzone, applyLookSettings,
 } from '../../js/utils.js';
 
 test('clamp confines a value to [a, b]', () => {
@@ -78,4 +78,34 @@ test('prefersReducedMotion reflects a stubbed matchMedia result', () => {
     if (origWindow === undefined) delete globalThis.window;
     else globalThis.window = origWindow;
   }
+});
+
+test('applyDeadzone snaps small input to 0', () => {
+  assert.deepEqual(applyDeadzone(0.1, 0, 0.18), { x: 0, y: 0 });
+  assert.deepEqual(applyDeadzone(0, 0, 0.18), { x: 0, y: 0 });
+});
+
+test('applyDeadzone stretches the outer range back to 0..1', () => {
+  const { x, y } = applyDeadzone(1, 0, 0.18);
+  assert.ok(Math.abs(x - 1) < 1e-9, `expected x≈1, got ${x}`);
+  assert.equal(y, 0);
+});
+
+test('applyDeadzone preserves direction and clamps magnitude to <=1', () => {
+  const { x, y } = applyDeadzone(0.6, 0.6, 0.18);
+  const mag = Math.hypot(x, y);
+  assert.ok(mag <= 1 + 1e-9, `expected magnitude <= 1, got ${mag}`);
+  assert.ok(Math.abs(x - y) < 1e-9, '入力が等しいなら出力も等しいはず（方向を保つ）');
+});
+
+test('applyLookSettings scales dx/dy by sensitivity', () => {
+  assert.deepEqual(applyLookSettings(10, -6, 1, false), { dx: 10, dy: -6 });
+  assert.deepEqual(applyLookSettings(10, -6, 2, false), { dx: 20, dy: -12 });
+  assert.deepEqual(applyLookSettings(10, -6, 0.5, false), { dx: 5, dy: -3 });
+});
+
+test('applyLookSettings flips only dy when invertY is true', () => {
+  const r = applyLookSettings(10, -6, 1, true);
+  assert.equal(r.dx, 10, 'dxはinvertYの影響を受けない');
+  assert.equal(r.dy, 6);
 });

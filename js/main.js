@@ -3,11 +3,18 @@ import * as THREE from '../vendor/three/three.module.min.js';
 import { Game } from './game.js';
 import { Hud } from './hud.js';
 import { Input } from './input.js';
-import { initAudio, setMuted, isMuted } from './audio.js';
+import {
+  initAudio, setMuted, isMuted,
+  setBgmVolume, getBgmVolume, setSfxVolume, getSfxVolume,
+} from './audio.js';
 import { ONI_PERSONALITIES, setForcedOniPersonality, getForcedOniPersonality } from './oni.js';
 import { STAGE_EVENTS } from './stageEvents.js';
 
 const MUTE_KEY = 'ningenkagu.muted';
+const BGM_VOLUME_KEY = 'ningenkagu.bgmVolume';
+const SFX_VOLUME_KEY = 'ningenkagu.sfxVolume';
+const SENSITIVITY_KEY = 'ningenkagu.lookSensitivity';
+const INVERT_Y_KEY = 'ningenkagu.invertY';
 const STAGE_KEY = 'ningenkagu.stageIndex';
 const STAGES = [
   { id: 'living', label: 'STAGE 1　リビング', name: 'リビング', clearNote: 'リビング突破！ 次は机とロッカーだらけの教室。鬼の巡回路も変わる。' },
@@ -208,6 +215,14 @@ function boot(renderer) {
   const btnHow = document.getElementById('btnHow');
   const btnConfig = document.getElementById('btnConfig');
   const btnSound = document.getElementById('btnSound');
+  const rangeBgmVolume = document.getElementById('rangeBgmVolume');
+  const bgmVolumeVal = document.getElementById('bgmVolumeVal');
+  const rangeSfxVolume = document.getElementById('rangeSfxVolume');
+  const sfxVolumeVal = document.getElementById('sfxVolumeVal');
+  const rangeSensitivity = document.getElementById('rangeSensitivity');
+  const sensitivityVal = document.getElementById('sensitivityVal');
+  const btnInvertY = document.getElementById('btnInvertY');
+  const gamepadStatus = document.getElementById('gamepadStatus');
   const selStageName = document.getElementById('selStageName');
   const selStageBest = document.getElementById('selStageBest');
   const stageBtns = [...document.querySelectorAll('[data-stage]')];
@@ -385,6 +400,71 @@ function boot(renderer) {
   try { savedMute = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { /* noop */ }
   applyMuted(savedMute);
 
+  /** 0〜100 の整数として保存する。パーセント表示・スライダーの値と直接対応させる */
+  function loadPercent(key, fallback) {
+    let v = fallback;
+    try {
+      const raw = parseInt(localStorage.getItem(key), 10);
+      if (Number.isFinite(raw)) v = raw;
+    } catch (e) { /* noop */ }
+    return v;
+  }
+  function savePercent(key, v) {
+    try { localStorage.setItem(key, String(v)); } catch (e) { /* 保存できなくても続行 */ }
+  }
+
+  function applyBgmVolume(pct, { persist = true } = {}) {
+    setBgmVolume(pct / 100);
+    if (rangeBgmVolume) rangeBgmVolume.value = String(pct);
+    if (bgmVolumeVal) bgmVolumeVal.textContent = pct + '%';
+    if (persist) savePercent(BGM_VOLUME_KEY, pct);
+  }
+  function applySfxVolume(pct, { persist = true } = {}) {
+    setSfxVolume(pct / 100);
+    if (rangeSfxVolume) rangeSfxVolume.value = String(pct);
+    if (sfxVolumeVal) sfxVolumeVal.textContent = pct + '%';
+    if (persist) savePercent(SFX_VOLUME_KEY, pct);
+  }
+  function applySensitivity(pct, { persist = true } = {}) {
+    input.lookSensitivity = pct / 100;
+    if (rangeSensitivity) rangeSensitivity.value = String(pct);
+    if (sensitivityVal) sensitivityVal.textContent = pct + '%';
+    if (persist) savePercent(SENSITIVITY_KEY, pct);
+  }
+  function applyInvertY(on, { persist = true } = {}) {
+    input.invertY = on;
+    if (btnInvertY) {
+      btnInvertY.textContent = on ? 'オン' : 'オフ';
+      btnInvertY.classList.toggle('on', on);
+      btnInvertY.setAttribute('aria-pressed', String(on));
+    }
+    if (persist) { try { localStorage.setItem(INVERT_Y_KEY, on ? '1' : '0'); } catch (e) { /* noop */ } }
+  }
+
+  applyBgmVolume(loadPercent(BGM_VOLUME_KEY, 100), { persist: false });
+  applySfxVolume(loadPercent(SFX_VOLUME_KEY, 100), { persist: false });
+  applySensitivity(loadPercent(SENSITIVITY_KEY, 100), { persist: false });
+  let savedInvertY = false;
+  try { savedInvertY = localStorage.getItem(INVERT_Y_KEY) === '1'; } catch (e) { /* noop */ }
+  applyInvertY(savedInvertY, { persist: false });
+
+  if (rangeBgmVolume) rangeBgmVolume.addEventListener('input', () => applyBgmVolume(Number(rangeBgmVolume.value)));
+  if (rangeSfxVolume) rangeSfxVolume.addEventListener('input', () => applySfxVolume(Number(rangeSfxVolume.value)));
+  if (rangeSensitivity) rangeSensitivity.addEventListener('input', () => applySensitivity(Number(rangeSensitivity.value)));
+  bindTap(btnInvertY, () => applyInvertY(!input.invertY));
+
+  // ゲームパッドの接続状態を設定カードに出す（接続すれば自動で使えるので、ここは状態表示のみ）
+  function syncGamepadStatus() {
+    if (!gamepadStatus) return;
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const connected = pads && [...pads].some((p) => p && p.connected !== false);
+    gamepadStatus.textContent = connected ? '接続済み' : '未接続';
+    gamepadStatus.classList.toggle('on', connected);
+  }
+  window.addEventListener('gamepadconnected', syncGamepadStatus);
+  window.addEventListener('gamepaddisconnected', syncGamepadStatus);
+  syncGamepadStatus();
+
   // ここまで来ればボタン・状態の配線が全て終わっている。読み込み中の案内を消し、
   // タイトルの静的HTMLだけが先に触れてしまう状態を終わらせる。
   hideLoading();
@@ -432,6 +512,12 @@ function boot(renderer) {
     last = now;
     try {
       game.update(dt, input);
+      // タイトル・リザルトはゲームパッドの確認ボタン（擬態と同じボタン）でも進める。
+      // カードを開いている間は誤操作防止のため無視する（あそびかた/設定を見ている最中に暴発しないように）。
+      if (!input.enabled && input.consumeConfirm()
+        && !document.documentElement.classList.contains('title-card-open')) {
+        startFromCurrentScreen();
+      }
     } catch (err) {
       console.error(err);
     }
