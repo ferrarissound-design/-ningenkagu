@@ -326,3 +326,121 @@ test.describe('アクセシビリティ', () => {
     expect(await animName('#notice', 'inspect')).toBe('none');
   });
 });
+
+/** navigator.getGamepads を差し替え、テストから直接操作できる疑似ゲームパッドを用意する。 */
+async function stubGamepad(page) {
+  await page.addInitScript(() => {
+    window.__pad = {
+      connected: true,
+      axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 12 }, () => ({ pressed: false })),
+    };
+    navigator.getGamepads = () => [window.__pad];
+  });
+}
+
+function setPadAxes(page, axes) {
+  return page.evaluate((axes) => { window.__pad.axes = axes; }, axes);
+}
+
+/** ボタンを1フレーム分だけ押して離す（edge-triggered な消費なので押しっぱなしにしない） */
+async function tapPadButton(page, index) {
+  await page.evaluate((i) => { window.__pad.buttons[i].pressed = true; }, index);
+  await page.waitForTimeout(120);
+  await page.evaluate((i) => { window.__pad.buttons[i].pressed = false; }, index);
+  await page.waitForTimeout(120);
+}
+
+test.describe('設定', () => {
+  test('BGM音量・効果音音量・視点感度・Y軸反転をスライダー/ボタンで変更でき、リロード後も保持される', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+    await page.click('#btnConfig');
+
+    await expect(page.locator('#bgmVolumeVal')).toHaveText('100%');
+    await expect(page.locator('#sensitivityVal')).toHaveText('100%');
+    await expect(page.locator('#btnInvertY')).toHaveText('オフ');
+
+    await page.locator('#rangeBgmVolume').fill('40');
+    await page.locator('#rangeBgmVolume').dispatchEvent('input');
+    await expect(page.locator('#bgmVolumeVal')).toHaveText('40%');
+    const bgmVol = await page.evaluate(async () => (await import('/js/audio.js')).getBgmVolume());
+    expect(bgmVol).toBeCloseTo(0.4, 5);
+
+    await page.locator('#rangeSensitivity').fill('150');
+    await page.locator('#rangeSensitivity').dispatchEvent('input');
+    await expect(page.locator('#sensitivityVal')).toHaveText('150%');
+    expect(await page.evaluate(() => window.__ningenkagu.input.lookSensitivity)).toBeCloseTo(1.5, 5);
+
+    await page.click('#btnInvertY');
+    await expect(page.locator('#btnInvertY')).toHaveText('オン');
+    expect(await page.evaluate(() => window.__ningenkagu.input.invertY)).toBe(true);
+
+    // localStorage への保存とリロード後の復元
+    await page.reload();
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+    await page.click('#btnConfig');
+    await expect(page.locator('#bgmVolumeVal')).toHaveText('40%');
+    await expect(page.locator('#sensitivityVal')).toHaveText('150%');
+    await expect(page.locator('#btnInvertY')).toHaveText('オン');
+    expect(await page.evaluate(() => window.__ningenkagu.input.lookSensitivity)).toBeCloseTo(1.5, 5);
+    expect(await page.evaluate(() => window.__ningenkagu.input.invertY)).toBe(true);
+  });
+});
+
+test.describe('ゲームパッド', () => {
+  test('左スティックで移動、右スティックで視点操作、ボタンでポーズ切替ができる', async ({ page }) => {
+    await stubGamepad(page);
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    // syncGamepadStatus() は起動時に navigator.getGamepads() を直接見るので、
+    // gamepadconnected イベントを待たずに検出できる
+    await expect(page.locator('#gamepadStatus')).toHaveText('接続済み');
+
+    await page.click('#btnStart');
+    await page.waitForTimeout(300);
+
+    const posBefore = await page.evaluate(() => ({ ...window.__ningenkagu.game.player.position }));
+    await setPadAxes(page, [1, 0, 0, 0]); // 左スティックを右へ全開
+    await page.waitForTimeout(500);
+    const posAfter = await page.evaluate(() => ({ ...window.__ningenkagu.game.player.position }));
+    const moved = Math.hypot(posAfter.x - posBefore.x, posAfter.z - posBefore.z);
+    expect(moved).toBeGreaterThan(0.1);
+    await setPadAxes(page, [0, 0, 0, 0]);
+
+    const yawBefore = await page.evaluate(() => window.__ningenkagu.game.camYaw);
+    await setPadAxes(page, [0, 0, 1, 0]); // 右スティックを右へ全開
+    await page.waitForTimeout(300);
+    const yawAfter = await page.evaluate(() => window.__ningenkagu.game.camYaw);
+    expect(yawAfter).not.toBeCloseTo(yawBefore, 3);
+    await setPadAxes(page, [0, 0, 0, 0]);
+
+    const poseBefore = await page.evaluate(() => window.__ningenkagu.game.player.pose);
+    await tapPadButton(page, 1); // ポーズ切替ボタン
+    const poseAfter = await page.evaluate(() => window.__ningenkagu.game.player.pose);
+    expect(poseAfter).not.toBe(poseBefore);
+  });
+
+  test('確認ボタン（擬態と同じボタン）でタイトルから開始でき、カードを開いている間は無視される', async ({ page }) => {
+    await stubGamepad(page);
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    await expect.poll(() => page.evaluate(() => window.__ningenkagu.game.state)).toBe('title');
+    await tapPadButton(page, 0);
+    await expect.poll(() => page.evaluate(() => window.__ningenkagu.game.state)).toBe('playing');
+
+    // タイトルへ戻し、カードを開いた状態で確認ボタンを押しても暴発しないこと
+    await page.evaluate(() => window.__ningenkagu.game.lose());
+    await page.waitForTimeout(200);
+    await page.click('#btnResultTitle');
+    await expect.poll(() => page.evaluate(() => window.__ningenkagu.game.state)).toBe('title');
+
+    await page.click('#btnHow');
+    await expect(page.locator('html')).toHaveClass(/title-card-open/);
+    await tapPadButton(page, 0);
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => window.__ningenkagu.game.state)).toBe('title');
+  });
+});
