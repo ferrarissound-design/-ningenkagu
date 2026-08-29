@@ -47,7 +47,32 @@ test.describe('起動', () => {
 
     await expect(page.locator('#title')).toBeVisible();
     await expect(page.locator('#fatal')).toBeHidden();
+    await expect(page.locator('#loading')).toBeHidden();
     expect(errors).toEqual([]);
+  });
+
+  test('読み込み中は#loadingが前面に出て、boot()完了で消える', async ({ page }) => {
+    // JSモジュールの取得に時間がかかっている間、静的HTMLのタイトル画面
+    // （ボタン等）が先に操作できてしまわないよう #loading で覆う。
+    // ローカルではスクリプトの取得が一瞬で終わるため、意図的に main.js の
+    // レスポンスを遅らせて「読み込み中の見え方」を決定的に再現する。
+    let releaseMain;
+    const held = new Promise((resolve) => { releaseMain = resolve; });
+    await page.route('**/js/main.js', async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    const gotoPromise = page.goto('/index.html');
+    // main.js が止まっている間は #loading が見えていて、まだ __ningenkagu も無い
+    await expect(page.locator('#loading')).toBeVisible();
+    await expect(page.locator('#loading')).toHaveAttribute('role', 'status');
+    expect(await page.evaluate(() => !!window.__ningenkagu)).toBe(false);
+
+    releaseMain();
+    await gotoPromise;
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+    await expect(page.locator('#loading')).toBeHidden();
   });
 });
 
