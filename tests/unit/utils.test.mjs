@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from '../../vendor/three/three.module.min.js';
 import {
   clamp, lerp, damp, angleDelta, rectDistance, colorDistance, colorMatchScore,
+  prefersReducedMotion,
 } from '../../js/utils.js';
 
 test('clamp confines a value to [a, b]', () => {
@@ -56,4 +57,25 @@ test('colorMatchScore is 1 for identical colors and clamped to [0, 1]', () => {
   const black = new THREE.Color(0x000000);
   const score = colorMatchScore(white, black);
   assert.ok(score >= 0 && score <= 1, `${score} should be within [0, 1]`);
+});
+
+test('prefersReducedMotion is false when window/matchMedia is unavailable (Node環境)', () => {
+  assert.equal(typeof window, 'undefined');
+  assert.equal(prefersReducedMotion(), false);
+});
+
+test('prefersReducedMotion reflects a stubbed matchMedia result', () => {
+  const origWindow = globalThis.window;
+  try {
+    globalThis.window = {
+      matchMedia: (query) => ({ matches: query === '(prefers-reduced-motion: reduce)' }),
+    };
+    assert.equal(prefersReducedMotion(), true);
+
+    globalThis.window = { matchMedia: () => ({ matches: false }) };
+    assert.equal(prefersReducedMotion(), false);
+  } finally {
+    if (origWindow === undefined) delete globalThis.window;
+    else globalThis.window = origWindow;
+  }
 });

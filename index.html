@@ -45,10 +45,10 @@
     <div id="oniPtr" aria-hidden="true"><span class="eye">👁</span><span class="arrow"></span></div>
 
     <!-- 家具検査などの一時的な大きめ表示。常設UIは増やさない -->
-    <div id="notice" aria-hidden="true"><span id="noticeText"></span></div>
+    <div id="notice" role="alert"><span id="noticeText"></span></div>
 
-    <div id="popups"></div>
-    <div id="toast"></div>
+    <div id="popups" role="status" aria-live="polite"></div>
+    <div id="toast" role="status" aria-live="polite"></div>
 
     <div id="controls">
       <div id="stick"><div id="knob"></div></div>

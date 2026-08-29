@@ -252,3 +252,52 @@ test.describe('モバイルのタイトルカード', () => {
     await expect(page.locator('#btnHow')).toHaveAttribute('aria-expanded', 'false');
   });
 });
+
+test.describe('アクセシビリティ', () => {
+  test('通知・トースト・ポップアップはスクリーンリーダー向けのライブリージョンになっている', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    // #notice はかつて aria-hidden="true" で常時読み上げ対象から外れていた
+    // （家具検査の開始・振り返りの予兆・ステージイベントなど、ゲームの根幹情報が
+    // すべて視覚のみになっていた）。role="alert" は aria-hidden と両立しないので、
+    // 属性ごと外れていることを確認する。
+    await expect(page.locator('#notice')).not.toHaveAttribute('aria-hidden');
+    await expect(page.locator('#notice')).toHaveAttribute('role', 'alert');
+    await expect(page.locator('#toast')).toHaveAttribute('role', 'status');
+    await expect(page.locator('#toast')).toHaveAttribute('aria-live', 'polite');
+    await expect(page.locator('#popups')).toHaveAttribute('role', 'status');
+    await expect(page.locator('#popups')).toHaveAttribute('aria-live', 'polite');
+
+    // 実際に hud.toast() で文言が届くこと（ライブリージョンが空のまま、ではない）
+    await page.evaluate(() => window.__ningenkagu.hud.toast('テスト通知'));
+    await expect(page.locator('#toast')).toHaveText('テスト通知');
+  });
+
+  test('prefers-reduced-motion では明滅系のCSSアニメーションが止まる', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    // js/utils.js の prefersReducedMotion() がページ内でも true を返すこと。
+    // stageEvents.js の消灯イベント時のストロボはこれで無効化される
+    // （イベントは開始10秒以降にしか起きないため、ここではフラグだけを確認する）。
+    const flag = await page.evaluate(async () => {
+      const { prefersReducedMotion } = await import('/js/utils.js');
+      return prefersReducedMotion();
+    });
+    expect(flag).toBe(true);
+
+    // 時間切迫の点滅・危険時の画面パルス・家具検査/警報の通知パルスが
+    // reduced-motion 下では止まっていること（色・不透明度による表示は残る）
+    const animName = (sel, addClass) => page.evaluate(({ sel, addClass }) => {
+      const el = document.querySelector(sel);
+      if (addClass) el.classList.add(addClass);
+      return getComputedStyle(el).animationName;
+    }, { sel, addClass });
+
+    expect(await animName('#time', 'urgent')).toBe('none');
+    expect(await animName('#warn', 'pulse')).toBe('none');
+    expect(await animName('#notice', 'inspect')).toBe('none');
+  });
+});

@@ -37,6 +37,12 @@ export function colorMatchScore(c1, c2) {
   return clamp(1 - colorDistance(c1, c2) * 1.9, 0, 1);
 }
 
+/** OS/ブラウザの「アニメーションを減らす」設定。matchMedia が無い環境では false 扱い */
+export function prefersReducedMotion() {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 /**
  * マテリアルとそこにぶら下がるテクスチャを解放する。
  * テクスチャは map / emissiveMap など名前が様々なので、

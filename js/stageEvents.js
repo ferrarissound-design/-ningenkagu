@@ -4,7 +4,7 @@
 // game.js には「毎フレーム update するマネージャ」しか置かないので、
 // ステージ4・5を足すときは STAGE_EVENTS に1項目書き足すだけでよい。
 import * as THREE from '../vendor/three/three.module.min.js';
-import { clamp, damp, randRange } from './utils.js';
+import { clamp, damp, randRange, prefersReducedMotion } from './utils.js';
 import { STATE } from './oni.js';
 import { sfx } from './audio.js';
 
@@ -357,9 +357,11 @@ export class StageEventManager {
   // ---------------- 演出 ----------------
 
   updateVisuals(dt) {
-    // 明るさは必ず補間で戻す（イベントが途中で終わっても元に戻り切る）
+    // 明るさは必ず補間で戻す（イベントが途中で終わっても元に戻り切る）。
+    // 点滅（ストロボ）は光過敏の観点で prefers-reduced-motion では出さない。
+    // 明滅の代わりに setDim() 由来の dim → dimTarget のなめらかな補間だけが残る。
     const wasFlicker = this.flicker;
-    this.flicker = this.phase === EVENT_PHASE.WARNING
+    this.flicker = this.phase === EVENT_PHASE.WARNING && !prefersReducedMotion()
       ? Math.max(0, Math.sin(this.elapsed * 17)) * 0.34
       : 0;
     const changed = Math.abs(this.dim - this.dimTarget) > 0.001 || this.flicker !== wasFlicker;
