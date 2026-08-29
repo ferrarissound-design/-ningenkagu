@@ -50,8 +50,14 @@ function saveStageIndex(index) {
   try { localStorage.setItem(STAGE_KEY, String(index)); } catch (e) { /* 保存できなくても続行 */ }
 }
 
+/** 読み込み中の案内を消す。起動が成功しても失敗しても、この状態には留めない */
+function hideLoading() {
+  document.getElementById('loading')?.classList.add('hidden');
+}
+
 /** 起動できなかった理由を画面に出す（真っ暗なまま放置しない） */
 function showFatal(message) {
+  hideLoading();
   const el = document.getElementById('fatal');
   const note = document.getElementById('fatalNote');
   if (note) note.textContent = message;
@@ -378,6 +384,10 @@ function boot(renderer) {
   let savedMute = false;
   try { savedMute = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { /* noop */ }
   applyMuted(savedMute);
+
+  // ここまで来ればボタン・状態の配線が全て終わっている。読み込み中の案内を消し、
+  // タイトルの静的HTMLだけが先に触れてしまう状態を終わらせる。
+  hideLoading();
 
   hud.onResultChange = (shown) => {
     if (shown) {

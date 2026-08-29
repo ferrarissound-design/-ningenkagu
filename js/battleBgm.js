@@ -10,8 +10,8 @@ import { isMuted, onMuteChange } from './audio.js';
 import { getGameState, onGameState } from './gameState.js';
 import './titleMenu.js';
 
-const TITLE_BGM_URL = new URL('../css/behind_the_potted_plant.mp3', import.meta.url).href;
-const BATTLE_BGM_URL = new URL('../css/gold_medal_morning.mp3', import.meta.url).href;
+const TITLE_BGM_URL = new URL('../assets/audio/behind_the_potted_plant.mp3', import.meta.url).href;
+const BATTLE_BGM_URL = new URL('../assets/audio/gold_medal_morning.mp3', import.meta.url).href;
 
 function makeBgm(url, volume, autoplay = false) {
   const audio = new Audio(url);

@@ -425,6 +425,22 @@ html, body {
 }
 .screen.hidden { display: none; }
 
+/* タイトルの静的HTMLより確実に前面へ。#title と同じ z-index (10) だと
+   DOM順に依存してしまうため、読み込み中は明示的に一番上へ出す */
+#loading {
+  z-index: 50;
+  background: rgba(6, 7, 10, .92);
+}
+.spinner {
+  width: 34px; height: 34px;
+  margin: 0 auto 4px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.18);
+  border-top-color: var(--neon);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .panel {
   width: min(440px, 92vw);
   background: var(--panel);
@@ -749,6 +765,7 @@ html.title-card-open #title .tcard {
   #warn.pulse { animation: none; }
   #notice.inspect,
   #notice.event.alarm { animation: none; }
+  .spinner { animation: none; border-top-color: rgba(255,255,255,.18); }
 }
 
 /* 低い画面（横持ちスマホ）向けの調整 */

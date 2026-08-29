@@ -173,6 +173,18 @@
       <p class="note" id="fatalNote"></p>
     </div>
   </div>
+
+  <!--
+    読み込み中の案内。JSモジュール一式が読み込まれ boot() が完了するまでの間、
+    タイトルの静的HTML（ボタン等）が操作できてしまうのを防ぐため、
+    #title より前面を覆っておく。boot() の最後（または失敗時）に隠す。
+  -->
+  <div id="loading" class="screen" role="status" aria-live="polite">
+    <div class="panel">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="note">読み込み中…</p>
+    </div>
+  </div>
 </div>
 
 <noscript><p style="color:#fff;text-align:center">このゲームには JavaScript が必要です。</p></noscript>
