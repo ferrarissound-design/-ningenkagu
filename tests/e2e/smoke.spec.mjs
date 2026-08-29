@@ -197,3 +197,58 @@ test.describe('BGMの状態追従', () => {
     expect(t).toBeLessThan(1.0);
   });
 });
+
+test.describe('モバイルのタイトルカード', () => {
+  // css/style.css の html.title-card-open 系ルールと js/main.js の
+  // touchmove スコープが噛み合って初めて、カード内が実際にスクロールできる。
+  // どちらか片方でも壊れると「開くが操作できないカード」に戻ってしまう回帰。
+  //
+  // 実OSのタッチスクロール（CDP Input.dispatchTouchEvent 経由）で検証すると、
+  // ジェスチャー認識がブラウザ/実行環境ごとに揺れて信頼できなかった
+  // （このサンドボックスでは通ったが、GitHub Actions のランナーでは
+  // 2回とも scrollTop が動かず失敗した）。そのため、実際に変更した
+  // ロジックそのもの — main.js の touchmove ハンドラが `.tcard` 内では
+  // preventDefault しないこと — を直接検証する決定的な形に置き換えてある。
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('あそびかたカードを開いて閉じられ、カード内のtouchmoveは抑止されない', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    await expect(page.locator('.tl-side')).toBeHidden();
+
+    await page.click('#btnHow');
+    await expect(page.locator('html')).toHaveClass(/title-card-open/);
+    await expect(page.locator('#cardHow')).toBeVisible();
+    const closeBtn = page.locator('#cardHow .titleCardClose');
+    await expect(closeBtn).toBeVisible();
+
+    // カード内は touch-action: pan-y が効いていること（CSS側の担当）
+    const touchAction = await page.evaluate(
+      () => getComputedStyle(document.getElementById('cardHow')).touchAction,
+    );
+    expect(touchAction).toBe('pan-y');
+
+    // main.js の document touchmove ハンドラは `.tcard` 内を対象から除外している
+    // （main.js側の担当）。カード内では preventDefault されず、
+    // カード外（ゲーム画面）では従来通り preventDefault されることを確認する。
+    const insidePrevented = await page.evaluate(() => {
+      const el = document.querySelector('#cardHow .tcard-p') || document.getElementById('cardHow');
+      const ev = new Event('touchmove', { bubbles: true, cancelable: true });
+      el.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    });
+    expect(insidePrevented).toBe(false);
+
+    const outsidePrevented = await page.evaluate(() => {
+      const ev = new Event('touchmove', { bubbles: true, cancelable: true });
+      document.getElementById('scene').dispatchEvent(ev);
+      return ev.defaultPrevented;
+    });
+    expect(outsidePrevented).toBe(true);
+
+    await closeBtn.click();
+    await expect(page.locator('html')).not.toHaveClass(/title-card-open/);
+    await expect(page.locator('#btnHow')).toHaveAttribute('aria-expanded', 'false');
+  });
+});
