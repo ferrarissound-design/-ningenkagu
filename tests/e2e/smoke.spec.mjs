@@ -444,3 +444,74 @@ test.describe('ゲームパッド', () => {
     expect(await page.evaluate(() => window.__ningenkagu.game.state)).toBe('title');
   });
 });
+
+test.describe('共有メタデータ', () => {
+  // OGP や manifest の不備は「SNSに貼るまで気づけない」類の壊れ方をする
+  // （タグの綴り間違い、画像の寸法違い、パスのtypo など）。
+  // 実ブラウザから宣言と実体の両方を突き合わせて固定しておく。
+  test('OGP/Twitter Card のタグが揃い、画像が宣言どおりの寸法で実在する', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    const meta = (sel, attr = 'content') => page.evaluate(
+      ({ sel, attr }) => document.querySelector(sel)?.getAttribute(attr) ?? null,
+      { sel, attr },
+    );
+
+    expect(await meta('meta[property="og:title"]')).toBe('ニンゲン家具');
+    expect(await meta('meta[property="og:type"]')).toBe('website');
+    expect(await meta('meta[name="twitter:card"]')).toBe('summary_large_image');
+    expect(await meta('meta[property="og:description"]')).toBeTruthy();
+    expect(await meta('meta[property="og:image:alt"]')).toBeTruthy();
+
+    // og:image と og:url は仕様上そのままクロールされるので絶対URLでなければならない。
+    // 相対パスにしてしまうとカードが出ないが、ローカルでは何も起きないので気づけない。
+    for (const sel of ['meta[property="og:image"]', 'meta[property="og:url"]']) {
+      expect(await meta(sel)).toMatch(/^https:\/\//);
+    }
+
+    // 宣言した寸法と実際の画像が食い違うと、切れたカードが表示される
+    const declared = {
+      w: Number(await meta('meta[property="og:image:width"]')),
+      h: Number(await meta('meta[property="og:image:height"]')),
+    };
+    const actual = await page.evaluate(() => new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve(null);
+      img.src = 'assets/ogp.jpg';
+    }));
+    expect(actual, 'assets/ogp.jpg が取得できること').not.toBeNull();
+    expect(actual).toEqual(declared);
+  });
+
+  test('manifest.json が取得でき、宣言したアイコンが実在する', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    expect(await page.evaluate(
+      () => document.querySelector('link[rel="manifest"]')?.getAttribute('href') ?? null,
+    )).toBe('manifest.json');
+
+    const manifest = await page.evaluate(async () => {
+      const r = await fetch('manifest.json');
+      return r.ok ? r.json() : null;
+    });
+    expect(manifest, 'manifest.json が200で返ること').not.toBeNull();
+    expect(manifest.name).toBe('ニンゲン家具');
+    expect(manifest.icons.length).toBeGreaterThan(0);
+
+    // manifest が指すアイコンが、宣言した sizes どおりに実在すること
+    for (const icon of manifest.icons) {
+      const [w, h] = icon.sizes.split('x').map(Number);
+      const actual = await page.evaluate((src) => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+        img.onerror = () => resolve(null);
+        img.src = src;
+      }), icon.src);
+      expect(actual, `${icon.src} が取得できること`).not.toBeNull();
+      expect(actual, `${icon.src} が ${icon.sizes} であること`).toEqual({ w, h });
+    }
+  });
+});

@@ -185,6 +185,9 @@ js/audio.js         WebAudio で合成する効果音（音素材ファイル不
 js/battleBgm.js     タイトル / プレイ中のBGM切替（gameState を購読して追従）
 js/titleMenu.js     スマホでのタイトルカード操作
 assets/audio/       BGM（タイトル曲・戦闘曲。効果音は audio.js が合成するので別途無し）
+assets/ogp.jpg      SNS共有カード用の画像（実際のタイトル画面から生成）
+assets/icon-*.png   ホーム画面に追加したときのアプリアイコン
+manifest.json       PWA としてインストールするための情報
 vendor/three/       Three.js r180 (MIT)
 ```
 
@@ -201,6 +204,20 @@ python3 -m http.server 8000
 
 リポジトリの Settings → Pages で Branch にこのブランチ、フォルダに `/ (root)` を指定するだけです。
 （Jekyll の処理を避けるため `.nojekyll` を置いてあります）
+
+スマホでは「ホーム画面に追加」でフルスクリーンのアプリとして起動できます（`manifest.json`）。
+
+**別の場所へ公開する場合**は、`index.html` の次の3か所を新しいURLへ差し替えてください。
+OGP の仕様上、`og:image` と `og:url` は絶対URLである必要があり、相対パスにすると
+SNSでカードが表示されません（ローカルでは何も起きないので気づきにくい箇所です）。
+
+- `<link rel="canonical">`
+- `<meta property="og:url">`
+- `<meta property="og:image">`
+
+共有用の画像（`assets/ogp.jpg`）とアプリアイコン（`assets/icon-192.png` / `icon-512.png`）は
+実際のゲーム画面から生成したものです。作り直す場合はローカルサーバーを立てた状態で
+Playwright からタイトル画面を 1200x630 で撮り直してください。
 
 ## テスト
 
