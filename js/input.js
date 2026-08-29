@@ -1,10 +1,20 @@
-// 入力（キーボード / マウス / タッチ）
+// 入力（キーボード / マウス / タッチ / ゲームパッド）
+import { applyDeadzone, applyLookSettings } from './utils.js';
 
 /**
  * スティックの遊び。
  * 指を軽く置いたままの微小な傾きで「静止」が途切れて擬態成功度が落ちるのを防ぐ。
  */
 const STICK_DEADZONE = 0.18;
+
+// --- ゲームパッド ---
+const PAD_MOVE_DEADZONE = 0.2;
+const PAD_LOOK_DEADZONE = 0.15;
+// 右スティック全開時の視点移動量。ポインタ操作と同じ「px相当/フレーム」の
+// スケールに揃えることで、視点感度スライダーがどちらにも同じように効く。
+const PAD_LOOK_SPEED = 1400;
+// 標準マッピング（Xbox/PS系）のボタン番号
+const PAD_BTN = { mimic: 0, pose: 1, decoy: 2, pauseA: 8, pauseB: 9 };
 
 export class Input {
   constructor(canvas, opts = {}) {
@@ -18,6 +28,10 @@ export class Input {
     this.stick = { x: 0, y: 0 };
     this.enabled = false;
 
+    // 設定カードから変更される値。デフォルトは「今まで通り」。
+    this.lookSensitivity = 1;
+    this.invertY = false;
+
     this.canvas = canvas;
     this.stickEl = opts.stickEl;
     this.knobEl = opts.knobEl;
@@ -25,6 +39,11 @@ export class Input {
     this._stickPointer = null;
     this._lookPointer = null;
     this._lastLook = { x: 0, y: 0 };
+
+    // ゲームパッド。接続の有無に関わらず毎フレーム updateGamepad() で読み直す。
+    this._padMove = { x: 0, y: 0 };
+    this._padPrevButtons = null;
+    this._confirmPressed = false;
 
     this.bindKeyboard();
     this.bindLook();
@@ -43,6 +62,9 @@ export class Input {
     this.stick.x = 0; this.stick.y = 0;
     this._stickPointer = null;
     this._lookPointer = null;
+    this._padMove.x = 0; this._padMove.y = 0;
+    this._padPrevButtons = null;
+    this._confirmPressed = false;
     this.resetKnob();
   }
 
@@ -137,6 +159,61 @@ export class Input {
     if (this.knobEl) this.knobEl.style.transform = 'translate(0px, 0px)';
   }
 
+  /**
+   * ゲームパッドを毎フレーム読み直す。ボタンイベントが無い API なので、
+   * 前フレームの押下状態と比較して「押した瞬間」を自分で検出する。
+   * ゲーム状態に関わらず（タイトルやリザルトでも）呼ばれる想定なので、
+   * enabled チェックはこの中では行わない箇所がある
+   * （確認ボタンだけは画面遷移にも使うため）。
+   */
+  updateGamepad(dt) {
+    if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
+    const pads = navigator.getGamepads();
+    const pad = pads && [...pads].find((p) => p && p.connected !== false);
+    if (!pad) {
+      this._padPrevButtons = null;
+      return;
+    }
+
+    const buttons = pad.buttons || [];
+    const pressed = (i) => !!(buttons[i] && buttons[i].pressed);
+    const prev = this._padPrevButtons;
+    const justPressed = (i) => pressed(i) && !(prev && prev[i]);
+
+    // 確認ボタン（擬態と同じボタン）はタイトル・ポーズ・リザルトの進行にも使う
+    this._confirmPressed = this._confirmPressed || justPressed(PAD_BTN.mimic);
+
+    if (this.enabled) {
+      const axes = pad.axes || [];
+      const mv = applyDeadzone(axes[0] || 0, -(axes[1] || 0), PAD_MOVE_DEADZONE);
+      this._padMove.x = mv.x;
+      this._padMove.y = mv.y;
+
+      const lk = applyDeadzone(axes[2] || 0, axes[3] || 0, PAD_LOOK_DEADZONE);
+      if (lk.x || lk.y) {
+        this.lookDX += lk.x * PAD_LOOK_SPEED * dt;
+        this.lookDY += lk.y * PAD_LOOK_SPEED * dt;
+      }
+
+      if (justPressed(PAD_BTN.mimic)) this.mimicCount++;
+      if (justPressed(PAD_BTN.pose)) this.poseCount++;
+      if (justPressed(PAD_BTN.decoy)) this.decoyCount++;
+      if (justPressed(PAD_BTN.pauseA) || justPressed(PAD_BTN.pauseB)) this.pauseCount++;
+    } else {
+      this._padMove.x = 0;
+      this._padMove.y = 0;
+    }
+
+    this._padPrevButtons = buttons.map((b) => !!(b && b.pressed));
+  }
+
+  /** タイトル・ポーズ・リザルト画面をゲームパッドの確認ボタンで進められるように */
+  consumeConfirm() {
+    const v = this._confirmPressed;
+    this._confirmPressed = false;
+    return v;
+  }
+
   pressMimic() { if (this.enabled) this.mimicCount++; }
   pressPose() { if (this.enabled) this.poseCount++; }
   pressDecoy() { if (this.enabled) this.decoyCount++; }
@@ -145,15 +222,10 @@ export class Input {
   /** {x: 右, y: 前} を -1..1 で返す */
   get move() {
     if (!this.enabled) return { x: 0, y: 0 };
-    let x = 0;
-    let y = 0;
     // 遊びの外側だけを 0..1 に引き伸ばして使う
-    const sm = Math.hypot(this.stick.x, this.stick.y);
-    if (sm > STICK_DEADZONE) {
-      const k = (sm - STICK_DEADZONE) / (1 - STICK_DEADZONE) / sm;
-      x = this.stick.x * k;
-      y = this.stick.y * k;
-    }
+    let { x, y } = applyDeadzone(this.stick.x, this.stick.y, STICK_DEADZONE);
+    x += this._padMove.x;
+    y += this._padMove.y;
     if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) y += 1;
     if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) y -= 1;
     if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) x += 1;
@@ -164,7 +236,7 @@ export class Input {
   }
 
   consumeLook() {
-    const r = { dx: this.lookDX, dy: this.lookDY };
+    const r = applyLookSettings(this.lookDX, this.lookDY, this.lookSensitivity, this.invertY);
     this.lookDX = 0; this.lookDY = 0;
     return r;
   }

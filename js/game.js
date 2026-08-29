@@ -200,6 +200,9 @@ export class Game {
 
   update(dt, input) {
     this.fx.update(dt);
+    // ゲーム状態に関わらず毎フレーム読む。タイトル・ポーズ・リザルトでも
+    // 確認ボタンで画面を進められるようにするため（main.js 側で consumeConfirm）
+    input.updateGamepad(dt);
 
     if (this.state === 'paused') {
       const wantResume = input.consumePause();

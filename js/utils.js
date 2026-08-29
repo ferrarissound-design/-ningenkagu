@@ -44,6 +44,25 @@ export function prefersReducedMotion() {
 }
 
 /**
+ * アナログスティックの遊びを取り除く。|x|,|y| が threshold 以下なら 0、
+ * それより外側だけを 0..1 に引き伸ばして返す（タッチスティック・ゲームパッド共通）。
+ */
+export function applyDeadzone(x, y, threshold) {
+  const m = Math.hypot(x, y);
+  if (m <= threshold) return { x: 0, y: 0 };
+  const k = (m - threshold) / (1 - threshold) / m;
+  return { x: x * k, y: y * k };
+}
+
+/**
+ * 視点入力の感度・Y軸反転設定を、マウス/タッチ/ゲームパッドいずれの
+ * dx・dy にも同じ場所で一様に適用する。
+ */
+export function applyLookSettings(dx, dy, sensitivity, invertY) {
+  return { dx: dx * sensitivity, dy: dy * sensitivity * (invertY ? -1 : 1) };
+}
+
+/**
  * マテリアルとそこにぶら下がるテクスチャを解放する。
  * テクスチャは map / emissiveMap など名前が様々なので、
  * プロパティを走査して isTexture のものをすべて落とす。

@@ -6,19 +6,23 @@
 //
 // 状態はゲーム本体（gameState）と音設定（audio）の通知を購読して受け取る。
 // ボタンの id やキーコードは一切見ないので、UI を作り替えても壊れない。
-import { isMuted, onMuteChange } from './audio.js';
+import { isMuted, onMuteChange, getBgmVolume, onBgmVolumeChange } from './audio.js';
 import { getGameState, onGameState } from './gameState.js';
 import './titleMenu.js';
 
 const TITLE_BGM_URL = new URL('../assets/audio/behind_the_potted_plant.mp3', import.meta.url).href;
 const BATTLE_BGM_URL = new URL('../assets/audio/gold_medal_morning.mp3', import.meta.url).href;
 
-function makeBgm(url, volume, autoplay = false) {
+// 曲ごとの基準音量。実際に鳴る音量はこれに設定のBGM音量（0..1）を掛けたもの。
+const TITLE_BASE_VOLUME = 0.38;
+const BATTLE_BASE_VOLUME = 0.42;
+
+function makeBgm(url, baseVolume, autoplay = false) {
   const audio = new Audio(url);
   audio.loop = true;
   audio.preload = 'auto';
   audio.autoplay = autoplay;
-  audio.volume = volume;
+  audio.volume = baseVolume * getBgmVolume();
   audio.setAttribute('playsinline', '');
   if (autoplay) audio.setAttribute('autoplay', '');
   audio.load();
@@ -26,8 +30,15 @@ function makeBgm(url, volume, autoplay = false) {
 }
 
 // タイトル曲はページ読み込み直後からブラウザ標準の autoplay も使って開始を試す。
-const titleBgm = makeBgm(TITLE_BGM_URL, 0.38, true);
-const battleBgm = makeBgm(BATTLE_BGM_URL, 0.42, false);
+const titleBgm = makeBgm(TITLE_BGM_URL, TITLE_BASE_VOLUME, true);
+const battleBgm = makeBgm(BATTLE_BGM_URL, BATTLE_BASE_VOLUME, false);
+
+// 設定の BGM 音量スライダーが動くたびに、鳴っている曲へ即反映する。
+onBgmVolumeChange(() => {
+  const v = getBgmVolume();
+  titleBgm.volume = TITLE_BASE_VOLUME * v;
+  battleBgm.volume = BATTLE_BASE_VOLUME * v;
+});
 
 function playTrack(audio, { restart = false } = {}) {
   if (isMuted()) {

@@ -1,4 +1,6 @@
 // WebAudio で合成する効果音（音素材ファイル不要）
+import { clamp } from './utils.js';
+
 let ctx = null;
 let muted = false;
 
@@ -43,8 +45,36 @@ export function onMuteChange(fn) {
   return () => muteListeners.delete(fn);
 }
 
+// --- 効果音（SE）の音量 ---
+// tone() は毎回すぐ鳴らして終わる一発ものなので、購読は不要。
+// 呼ばれた瞬間の音量を読んで gain に掛けるだけでよい。
+let sfxVolume = 1;
+export function setSfxVolume(v) { sfxVolume = clamp(v, 0, 1); }
+export function getSfxVolume() { return sfxVolume; }
+
+// --- BGM の音量 ---
+// こちらは battleBgm.js が生成した <audio> が鳴りっぱなしなので、
+// 設定変更をその場に反映させるための購読口が要る。
+let bgmVolume = 1;
+const bgmVolumeListeners = new Set();
+export function setBgmVolume(v) {
+  bgmVolume = clamp(v, 0, 1);
+  for (const fn of [...bgmVolumeListeners]) {
+    try {
+      fn(bgmVolume);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+}
+export function getBgmVolume() { return bgmVolume; }
+export function onBgmVolumeChange(fn) {
+  bgmVolumeListeners.add(fn);
+  return () => bgmVolumeListeners.delete(fn);
+}
+
 function tone(freq, dur, { type = 'sine', gain = 0.16, slideTo = null, delay = 0 } = {}) {
-  if (!ctx || muted) return;
+  if (!ctx || muted || sfxVolume <= 0) return;
   try {
     const t0 = ctx.currentTime + delay;
     const osc = ctx.createOscillator();
@@ -53,7 +83,7 @@ function tone(freq, dur, { type = 'sine', gain = 0.16, slideTo = null, delay = 0
     osc.frequency.setValueAtTime(freq, t0);
     if (slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t0 + dur);
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(gain * sfxVolume, t0 + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     osc.connect(g).connect(ctx.destination);
     osc.start(t0);

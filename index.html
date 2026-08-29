@@ -119,10 +119,39 @@
       <div class="tcard hidden" id="cardConfig">
         <h2 class="tcard-h">設定<i>CONFIG</i></h2>
         <div class="trow">
-          <span>効果音</span>
+          <span>サウンド</span>
           <button id="btnSound" class="chipbtn on" type="button" aria-pressed="true">オン</button>
         </div>
-        <p class="tcard-p">ベストスコアと進行状況はこのブラウザに保存されます。</p>
+        <div class="trow">
+          <label for="rangeBgmVolume">BGM音量</label>
+          <span class="trange">
+            <input type="range" id="rangeBgmVolume" min="0" max="100" step="10" value="100">
+            <b id="bgmVolumeVal">100%</b>
+          </span>
+        </div>
+        <div class="trow">
+          <label for="rangeSfxVolume">効果音音量</label>
+          <span class="trange">
+            <input type="range" id="rangeSfxVolume" min="0" max="100" step="10" value="100">
+            <b id="sfxVolumeVal">100%</b>
+          </span>
+        </div>
+        <div class="trow">
+          <label for="rangeSensitivity">視点感度</label>
+          <span class="trange">
+            <input type="range" id="rangeSensitivity" min="50" max="200" step="10" value="100">
+            <b id="sensitivityVal">100%</b>
+          </span>
+        </div>
+        <div class="trow">
+          <span>Y軸反転</span>
+          <button id="btnInvertY" class="chipbtn" type="button" aria-pressed="false">オフ</button>
+        </div>
+        <div class="trow">
+          <span>ゲームパッド</span>
+          <b id="gamepadStatus" class="gpstatus">未接続</b>
+        </div>
+        <p class="tcard-p">ベストスコアと進行状況・設定はこのブラウザに保存されます。</p>
       </div>
     </aside>
 
