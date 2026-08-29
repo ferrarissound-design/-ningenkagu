@@ -1,6 +1,6 @@
 // 鬼NPC：巡回・視界・警戒
 import * as THREE from '../vendor/three/three.module.min.js';
-import { clamp, damp, randRange, angleDelta, rectDistance } from './utils.js';
+import { clamp, damp, randRange, angleDelta, rectDistance, disposeObject3D } from './utils.js';
 import { resolveCollisions } from './stage.js';
 
 /** 視界の基準値。実際の値は性格タイプで倍率を掛けた this.view を使う */
@@ -1219,6 +1219,11 @@ export class Oni {
     const p = this.root.position;
     const want = Math.atan2(sense.px - p.x, sense.pz - p.z);
     this.facing += angleDelta(this.facing, want) * Math.min(1, dt * 8);
+  }
+
+  /** 見た目一式（「？」「！」のテクスチャや視界コーンを含む）を解放する */
+  dispose() {
+    disposeObject3D(this.root);
   }
 }
 

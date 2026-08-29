@@ -163,10 +163,13 @@ js/stage.js         部屋と家具の生成、擬態対象、当たり判定
 js/player.js        カグミンの見た目・表情・ポーズ
 js/oni.js           一つ目の見回りモンスター（巡回・視界・遮蔽判定・家具検査モード・性格タイプ）
 js/stageEvents.js   ステージ固有のランダムイベント（テレビ / チャイム / 消灯）
+js/gameState.js     ゲーム状態（title / playing / paused / win / lose）の通知口
 js/input.js         キーボード / マウス / タッチ入力
 js/hud.js           画面表示
 js/effects.js       擬態エフェクト、対象マーカー
 js/audio.js         WebAudio で合成する効果音（音素材ファイル不要）
+js/battleBgm.js     タイトル / プレイ中のBGM切替（gameState を購読して追従）
+js/titleMenu.js     スマホでのタイトルカード操作
 vendor/three/       Three.js r180 (MIT)
 ```
 
@@ -183,3 +186,21 @@ python3 -m http.server 8000
 
 リポジトリの Settings → Pages で Branch にこのブランチ、フォルダに `/ (root)` を指定するだけです。
 （Jekyll の処理を避けるため `.nojekyll` を置いてあります）
+
+## テスト
+
+ゲーム本体はビルド不要ですが、テストは Node と依存パッケージを使います。
+
+```sh
+npm install
+npm run test:unit   # 純粋関数のユニットテスト（Node標準の test ランナー、依存なし）
+npm run test:e2e    # 実ブラウザでの起動・状態遷移のスモークテスト（Playwright）
+npm test            # 両方まとめて実行
+```
+
+| | 内容 | 場所 |
+|---|---|---|
+| ユニットテスト | `utils.js` の各関数、`alertLevel`、`resolveCollisions`、`gameState.js` の状態通知、`audio.js` のミュート通知、`disposeObject3D` の解放範囲 | `tests/unit/` |
+| E2Eスモークテスト | 起動確認、ステージ切替・タイトル復帰を繰り返してもGPUリソース（ジオメトリ・テクスチャ）が増え続けないこと、BGMがゲーム状態に正しく追従すること | `tests/e2e/` |
+
+`npm run test:e2e` は初回のみブラウザのダウンロードが必要な場合があります（`npx playwright install chromium`）。GitHub Actions では `.github/workflows/ci.yml` が push・PRごとに両方を自動実行します。

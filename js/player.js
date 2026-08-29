@@ -1,6 +1,6 @@
 // プレイヤー（家具に化ける丸い生き物「カグミン」）
 import * as THREE from '../vendor/three/three.module.min.js';
-import { clamp, damp } from './utils.js';
+import { clamp, damp, disposeObject3D } from './utils.js';
 
 export const POSES = ['stand', 'tpose', 'ypose', 'crouch'];
 export const POSE_LABEL = {
@@ -354,5 +354,10 @@ export class Player {
     out[1].set(p.x, 1.08 * s, p.z);
     out[2].set(p.x, 0.45 * s, p.z);
     return out;
+  }
+
+  /** 見た目一式を解放する */
+  dispose() {
+    disposeObject3D(this.root);
   }
 }

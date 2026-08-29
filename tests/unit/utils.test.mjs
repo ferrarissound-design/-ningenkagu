@@ -1,0 +1,59 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from '../../vendor/three/three.module.min.js';
+import {
+  clamp, lerp, damp, angleDelta, rectDistance, colorDistance, colorMatchScore,
+} from '../../js/utils.js';
+
+test('clamp confines a value to [a, b]', () => {
+  assert.equal(clamp(5, 0, 10), 5);
+  assert.equal(clamp(-1, 0, 10), 0);
+  assert.equal(clamp(11, 0, 10), 10);
+});
+
+test('lerp interpolates linearly', () => {
+  assert.equal(lerp(0, 10, 0), 0);
+  assert.equal(lerp(0, 10, 1), 10);
+  assert.equal(lerp(0, 10, 0.5), 5);
+});
+
+test('damp moves toward the target and reaches it at dt=Infinity', () => {
+  const near = damp(0, 10, 5, 0.016);
+  assert.ok(near > 0 && near < 10, `expected 0 < ${near} < 10`);
+  assert.equal(damp(0, 10, 5, 1e9), 10);
+  assert.equal(damp(5, 5, 5, 0.1), 5, '目標と同じ値では動かない');
+});
+
+test('angleDelta normalizes to (-PI, PI]', () => {
+  const d = angleDelta(0, Math.PI * 1.5);
+  assert.ok(d > -Math.PI && d <= Math.PI, `${d} should be in (-PI, PI]`);
+  // 半周先へ回るより、逆向きに半周のほうが近いはず
+  assert.ok(Math.abs(d - (-Math.PI / 2)) < 1e-9);
+});
+
+test('angleDelta(a, a) is zero', () => {
+  assert.equal(angleDelta(1.23, 1.23), 0);
+});
+
+test('rectDistance is zero inside the rect, positive outside', () => {
+  const rect = { minX: 0, maxX: 2, minZ: 0, maxZ: 2 };
+  assert.equal(rectDistance(rect, 1, 1), 0);
+  assert.equal(rectDistance(rect, 3, 1), 1);
+  assert.equal(rectDistance(rect, 3, 4), Math.hypot(1, 2));
+});
+
+test('colorDistance is 0 for identical colors, positive otherwise', () => {
+  const white = new THREE.Color(0xffffff);
+  const black = new THREE.Color(0x000000);
+  assert.equal(colorDistance(white, white), 0);
+  assert.ok(colorDistance(white, black) > 0);
+});
+
+test('colorMatchScore is 1 for identical colors and clamped to [0, 1]', () => {
+  const c = new THREE.Color(0x7dffd0);
+  assert.equal(colorMatchScore(c, c), 1);
+  const white = new THREE.Color(0xffffff);
+  const black = new THREE.Color(0x000000);
+  const score = colorMatchScore(white, black);
+  assert.ok(score >= 0 && score <= 1, `${score} should be within [0, 1]`);
+});

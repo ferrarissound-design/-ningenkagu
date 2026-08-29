@@ -36,3 +36,34 @@ export function colorDistance(c1, c2) {
 export function colorMatchScore(c1, c2) {
   return clamp(1 - colorDistance(c1, c2) * 1.9, 0, 1);
 }
+
+/**
+ * マテリアルとそこにぶら下がるテクスチャを解放する。
+ * テクスチャは map / emissiveMap など名前が様々なので、
+ * プロパティを走査して isTexture のものをすべて落とす。
+ */
+function disposeMaterial(material) {
+  for (const value of Object.values(material)) {
+    if (value && value.isTexture) value.dispose();
+  }
+  material.dispose();
+}
+
+/**
+ * Three.js のオブジェクトツリーが確保した GPU リソースを解放し、親から外す。
+ *
+ * scene.remove() は表示から外すだけで、ジオメトリ・マテリアル・テクスチャは
+ * GPU に残り続ける。ステージを作り直すたびに部屋一式が積み上がるため、
+ * 捨てる側は必ずここを通す。
+ */
+export function disposeObject3D(root) {
+  if (!root) return;
+  root.traverse((obj) => {
+    if (obj.geometry) obj.geometry.dispose();
+    const material = obj.material;
+    if (!material) return;
+    if (Array.isArray(material)) material.forEach(disposeMaterial);
+    else disposeMaterial(material);
+  });
+  root.removeFromParent();
+}

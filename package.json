@@ -1,0 +1,15 @@
+{
+  "name": "ningenkagu",
+  "private": true,
+  "type": "module",
+  "description": "ニンゲン家具 (Ningen Kagu) — ブラウザだけで動く3Dステルスゲーム",
+  "scripts": {
+    "test:unit": "node --test tests/unit/**/*.test.mjs",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:e2e",
+    "serve": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}
