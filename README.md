@@ -236,3 +236,9 @@ npm test            # 両方まとめて実行
 | E2Eスモークテスト | 起動確認、ステージ切替・タイトル復帰を繰り返してもGPUリソース（ジオメトリ・テクスチャ）が増え続けないこと、BGMがゲーム状態に正しく追従すること | `tests/e2e/` |
 
 `npm run test:e2e` は初回のみブラウザのダウンロードが必要な場合があります（`npx playwright install chromium`）。GitHub Actions では `.github/workflows/ci.yml` が push・PRごとに両方を自動実行します。
+
+## ライセンス
+
+MIT License（[LICENSE](LICENSE) を参照）。BGM（`assets/audio/`）を含め、リポジトリ内で
+作成したものはすべて対象です。`vendor/three/` は Three.js 自体のライセンス
+（同じくMIT）に従います。
