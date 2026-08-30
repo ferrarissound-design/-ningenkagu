@@ -1,9 +1,11 @@
 // 画面表示（DOM）
 import { POSE_LABEL } from './player.js';
+import { rankForResult, isBetterRank, isRank } from './rank.js';
 
 const $ = (id) => document.getElementById(id);
 
 const BEST_KEY_PREFIX = 'ningenkagu.best.';
+const BEST_RANK_KEY_PREFIX = 'ningenkagu.rank.';
 const LEGACY_BEST_KEY = 'ningenkagu.best';
 
 // ステージ固有ルールを、ゲーム開始直後だけ短く伝える。
@@ -33,6 +35,20 @@ function saveBest(stageId, v) {
   try { localStorage.setItem(BEST_KEY_PREFIX + stageId, String(v)); } catch (e) { /* 保存できなくても続行 */ }
 }
 
+/** ステージ選択画面でも使うため、ベストランクの読み出しだけ公開する。 */
+export function loadBestRank(stageId) {
+  try {
+    const rank = localStorage.getItem(BEST_RANK_KEY_PREFIX + stageId);
+    return isRank(rank) ? rank : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveBestRank(stageId, rank) {
+  try { localStorage.setItem(BEST_RANK_KEY_PREFIX + stageId, rank); } catch (e) { /* 保存できなくても続行 */ }
+}
+
 export class Hud {
   constructor() {
     this.elTime = $('time');
@@ -55,6 +71,7 @@ export class Hud {
     this.elResultTitle = $('resultTitle');
     this.elResultScore = $('resultScore');
     this.elResultTime = $('resultTime');
+    this.elResultRank = $('resultRank');
     this.elResultNote = $('resultNote');
     this.elBest = $('bestScore');
     this.elSbSeen = $('sbSeen');
@@ -88,16 +105,18 @@ export class Hud {
     this._ptrState = '';
     this.stageId = 'living';
     this.best = loadBest(this.stageId);
+    this.bestRank = loadBestRank(this.stageId);
     this.elBest.textContent = this.best.toLocaleString('en-US');
     this.onResultChange = null;
   }
 
-  /** 表示中のベストスコアを、そのステージのものに切り替える */
+  /** 表示中のベストスコアとランクを、そのステージのものに切り替える */
   setStage(stageId) {
     // 前ステージの開始通知が時間差で残らないよう、切替時にまとめて止める。
     this.hideNotice();
     this.stageId = stageId;
     this.best = loadBest(stageId);
+    this.bestRank = loadBestRank(stageId);
     this.elBest.textContent = this.best.toLocaleString('en-US');
     this.elBest.parentElement.classList.remove('best');
   }
@@ -344,10 +363,23 @@ export class Hud {
       this.best = score;
       saveBest(this.stageId, this.best);
     }
+
+    // ランクはクリア時だけ付く。敗北時の高得点でベストランクが上書きされることはない。
+    const rank = rankForResult(win, score);
+    const isBestRank = isBetterRank(rank, this.bestRank);
+    if (isBestRank) {
+      this.bestRank = rank;
+      saveBestRank(this.stageId, rank);
+    }
+
     this.elResultTitle.textContent = win ? 'SURVIVED!' : 'FOUND!';
     this.elResultTitle.className = win ? 'win' : 'lose';
     this.elResultScore.textContent = score.toLocaleString('en-US');
     this.elResultTime.textContent = survived.toFixed(1) + ' 秒';
+    if (this.elResultRank) {
+      this.elResultRank.textContent = rank || '—';
+      this.elResultRank.parentElement.classList.toggle('best', isBestRank);
+    }
     this.elBest.textContent = this.best.toLocaleString('en-US');
     this.elBest.parentElement.classList.toggle('best', isBest && score > 0);
     this.elResultNote.textContent = note || '';
