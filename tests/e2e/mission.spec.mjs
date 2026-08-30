@@ -36,7 +36,9 @@ test.describe('ステージ別ミッション', () => {
     await page.click('#btnStart');
     await page.waitForFunction(() => !!window.__ningenkaguMissions.tracker());
 
-    await page.evaluate(() => { window.__ningenkagu.game.noiseWarned = true; });
+    // 実ゲームが足音を聞き取ったときと同じHUD通知経路を通し、
+    // 一度でも警告された事実がラッチされることを決定的に検証する。
+    await page.evaluate(() => window.__ningenkagu.hud.toast('足音が聞こえた…！'));
     await page.waitForFunction(() => window.__ningenkaguMissions.tracker()?.heardAlert === true);
     await page.evaluate(() => window.__ningenkagu.game.win());
 
