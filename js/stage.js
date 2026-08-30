@@ -5,6 +5,7 @@ import { buildLivingRoom } from './stages/living.js';
 import { buildClassroom } from './stages/classroom.js';
 import { buildArtRoom } from './stages/artroom.js';
 import { buildLibrary } from './stages/library.js';
+import { buildScienceRoom } from './stages/scienceroom.js';
 
 export { ROOM };
 
@@ -37,6 +38,7 @@ const STAGE_BUILDERS = {
   classroom: buildClassroom,
   artroom: buildArtRoom,
   library: buildLibrary,
+  scienceroom: buildScienceRoom,
 };
 
 export function buildStage(scene) {
