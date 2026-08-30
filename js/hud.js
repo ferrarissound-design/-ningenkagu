@@ -6,6 +6,16 @@ const $ = (id) => document.getElementById(id);
 const BEST_KEY_PREFIX = 'ningenkagu.best.';
 const LEGACY_BEST_KEY = 'ningenkagu.best';
 
+// ステージ固有ルールを、ゲーム開始直後だけ短く伝える。
+// 常設UIにはせず「今回の鬼」と同じ notice 枠を順番に使う。
+const START_RULES = {
+  library: {
+    icon: '🤫',
+    title: '静寂の図書室',
+    desc: '足音が遠くまで響く。しゃがんで進め！',
+  },
+};
+
 /** localStorage が使えない環境（プライベートモード等）でも落ちないようにする */
 function loadBest(stageId) {
   try {
@@ -58,6 +68,7 @@ export class Hud {
 
     this._toastTimer = null;
     this._noticeTimer = null;
+    this._personaTimer = null;
     this._lastDecoy = -1;
     this._lastTime = -1;
     this._lastScore = -1;
@@ -83,6 +94,8 @@ export class Hud {
 
   /** 表示中のベストスコアを、そのステージのものに切り替える */
   setStage(stageId) {
+    // 前ステージの開始通知が時間差で残らないよう、切替時にまとめて止める。
+    this.hideNotice();
     this.stageId = stageId;
     this.best = loadBest(stageId);
     this.elBest.textContent = this.best.toLocaleString('en-US');
@@ -241,11 +254,8 @@ export class Hud {
     this._noticeTimer = setTimeout(() => { el.className = ''; }, ms);
   }
 
-  /**
-   * ゲーム開始時に出す「今回の鬼」。
-   * 常設UIは増やさず、既存の notice 枠を3行表示にして使い回す。
-   */
-  personaNotice(icon, name, desc, ms = 2400) {
+  /** 「今回の鬼」の3行表示を実際に描画する。 */
+  showPersonaNotice(icon, name, desc, ms = 2400) {
     const el = this.elNotice;
     if (!el) return;
     const line = (cls, text) => {
@@ -266,6 +276,26 @@ export class Hud {
       el.className = '';
       this.elNoticeText.textContent = '';
     }, ms);
+  }
+
+  /**
+   * ゲーム開始時に出す「今回の鬼」。
+   * ステージ固有ルールがある面では、先にルールを約1.7秒見せてから鬼タイプへ切り替える。
+   */
+  personaNotice(icon, name, desc, ms = 2400) {
+    clearTimeout(this._personaTimer);
+    this._personaTimer = null;
+    const rule = START_RULES[this.stageId];
+    if (!rule) {
+      this.showPersonaNotice(icon, name, desc, ms);
+      return;
+    }
+
+    this.eventNotice(rule.icon + ' ' + rule.title, rule.desc, 'rule', 1700);
+    this._personaTimer = setTimeout(() => {
+      this._personaTimer = null;
+      this.showPersonaNotice(icon, name, desc, ms);
+    }, 1800);
   }
 
   /**
@@ -294,7 +324,11 @@ export class Hud {
 
   hideNotice() {
     clearTimeout(this._noticeTimer);
+    clearTimeout(this._personaTimer);
+    this._noticeTimer = null;
+    this._personaTimer = null;
     if (this.elNotice) this.elNotice.className = '';
+    if (this.elNoticeText) this.elNoticeText.textContent = '';
   }
 
   toast(text) {
