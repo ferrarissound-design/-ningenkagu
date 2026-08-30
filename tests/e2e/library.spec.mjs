@@ -34,6 +34,14 @@ test.describe('STAGE 4 図書室', () => {
     expect(stage.id).toBe('library');
     expect(stage.name).toBe('図書室');
     expect(stage.targets).toBeGreaterThanOrEqual(19);
+
+    // 図書室では「音のステージ」だと先に伝え、その後で従来の鬼タイプ表示へ切り替わる。
+    await expect(page.locator('#notice')).toHaveClass(/rule/);
+    await expect(page.locator('#noticeText')).toContainText('静寂の図書室');
+    await expect(page.locator('#noticeText')).toContainText('しゃがんで進め');
+    await expect(page.locator('#noticeText')).toContainText('今回の鬼', { timeout: 4_000 });
+    await expect(page.locator('#notice')).toHaveClass(/persona/);
+
     expect(errors).toEqual([]);
   });
 
@@ -42,6 +50,8 @@ test.describe('STAGE 4 図書室', () => {
     await page.click('#btnStart');
     await page.waitForFunction(() => window.__ningenkagu.game.state === 'playing');
 
+    // 開始演出の時間差タイマーを止めて、イベント告知だけを決定的に検証する。
+    await page.evaluate(() => window.__ningenkagu.hud.hideNotice());
     const started = await page.evaluate(() => window.__ningenkagu.triggerStageEvent());
     expect(started).toBe(true);
 
