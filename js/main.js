@@ -20,7 +20,8 @@ const STAGES = [
   { id: 'living', label: 'STAGE 1　リビング', name: 'リビング', clearNote: 'リビング突破！ 次は机とロッカーだらけの教室。鬼の巡回路も変わる。' },
   { id: 'classroom', label: 'STAGE 2　教室', name: '教室', clearNote: '教室突破！ 次は石膏像とイーゼルが並ぶ美術室。真っ白な像に紛れ込め。' },
   { id: 'artroom', label: 'STAGE 3　美術室', name: '美術室', clearNote: '美術室突破！ 次は本棚が並ぶ図書室。書架の間を縫って逃げ切れ。' },
-  { id: 'library', label: 'STAGE 4　図書室', name: '図書室', clearNote: '' },
+  { id: 'library', label: 'STAGE 4　図書室', name: '図書室', clearNote: '図書室突破！ 次は実験台と標本棚が並ぶ理科室。蒸気で鬼の視界が揺らぐ。' },
+  { id: 'scienceroom', label: 'STAGE 5　理科室', name: '理科室', clearNote: '' },
 ];
 
 // 各ステージの開始直後に「部屋の中が見える」構図を作る。
@@ -45,6 +46,11 @@ const START_VIEWS = {
   library: {
     position: [-4.0, 0, 3.2],
     yaw: -2.35,
+    pitch: 0.48,
+  },
+  scienceroom: {
+    position: [-4.6, 0, 3.6],
+    yaw: -2.25,
     pitch: 0.48,
   },
 };
@@ -232,6 +238,20 @@ function boot(renderer) {
   const selStageName = document.getElementById('selStageName');
   const selStageBest = document.getElementById('selStageBest');
   const selStageRank = document.getElementById('selStageRank');
+
+  // ステージ定義を増やしても静的HTMLのボタン追加を忘れないよう、不足分はここで補う。
+  const stageBar = document.querySelector('.tl-bottom');
+  if (stageBar) {
+    for (let i = 0; i < STAGES.length; i++) {
+      if (stageBar.querySelector(`[data-stage="${i}"]`)) continue;
+      const btn = document.createElement('button');
+      btn.className = 'chipbtn';
+      btn.type = 'button';
+      btn.dataset.stage = String(i);
+      btn.textContent = `${i + 1}　${STAGES[i].name}`;
+      stageBar.appendChild(btn);
+    }
+  }
   const stageBtns = [...document.querySelectorAll('[data-stage]')];
   const cards = {
     info: document.getElementById('cardInfo'),
@@ -317,7 +337,6 @@ function boot(renderer) {
   function applyStageStartView() {
     const cfg = START_VIEWS[STAGES[stageIndex].id];
     if (!cfg) return;
-
     game.player.reset(new THREE.Vector3(...cfg.position));
     game.camYaw = cfg.yaw;
     game.camPitch = cfg.pitch;
