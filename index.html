@@ -116,6 +116,7 @@
         <dl class="tstat">
           <div><dt>ステージ</dt><dd id="selStageName">リビング</dd></div>
           <div><dt>ベスト</dt><dd id="selStageBest">0</dd></div>
+          <div><dt>ランク</dt><dd id="selStageRank">-</dd></div>
         </dl>
       </div>
 
@@ -136,6 +137,7 @@
         <p class="tcard-p"><b>④ 家具検査を耐えろ</b><br>鬼が近づいてじっくり確認してくることがある。振り向かれても動かなければ大ボーナス。</p>
         <p class="tcard-p"><b>⑤ 危険なほど高得点</b><br>鬼の目の前で見つからずに家具になりきるほどスコアが伸びる。安全地帯だけでは高得点は狙えない。</p>
         <p class="tcard-p"><b>⑥ 「おとり」で自分から隙を作る</b><br>今向いている方向へ物音を投げ、鬼の注意をそこへ引きつける。1ゲームに数回だけ使える切り札。</p>
+        <p class="tcard-p"><b>⑦ クリア評価を上げろ</b><br>60秒生存するとスコアに応じて C / B / A / S で評価。各ステージのベストランク更新を狙おう。</p>
         <p class="tcard-p">プレイ中はステージごとのイベントも発生。鬼の注意がそれた瞬間は移動のチャンス。</p>
       </div>
 
@@ -174,7 +176,7 @@
           <span>ゲームパッド</span>
           <b id="gamepadStatus" class="gpstatus">未接続</b>
         </div>
-        <p class="tcard-p">ベストスコアと進行状況・設定はこのブラウザに保存されます。</p>
+        <p class="tcard-p">ベストスコア・ベストランク・進行状況・設定はこのブラウザに保存されます。</p>
       </div>
     </aside>
 
@@ -203,6 +205,7 @@
     <div class="panel">
       <h2 id="resultTitle" class="win">SURVIVED!</h2>
       <div class="stats">
+        <div><span>評価</span><b id="resultRank">—</b></div>
         <div><span>スコア</span><b id="resultScore">0</b></div>
         <div><span>生存時間</span><b id="resultTime">0.0 秒</b></div>
         <div><span>ベスト</span><b id="bestScore">0</b></div>
