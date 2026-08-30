@@ -4,6 +4,7 @@ import { MISSIONS, evaluateMission } from './mission.js';
 
 const KEY_PREFIX = 'ningenkagu.mission.';
 const ACTIVE_PHASES = new Set(['active', 'warning']);
+const HEARING_ALERT_TEXT = '足音が聞こえた…！';
 
 function loadCompleted(stageId) {
   try { return localStorage.getItem(KEY_PREFIX + stageId) === '1'; }
@@ -33,8 +34,6 @@ function trackFrame(t, game) {
 
   const target = game.player.mimicTarget;
   if (target?.kind) t.mimicKinds.add(target.kind);
-
-  if (t.stageId === 'library' && game.noiseWarned) t.heardAlert = true;
 
   const p = game.player.position;
   if (t.stageId === 'artroom' && ACTIVE_PHASES.has(game.stageEvent?.phase)) {
@@ -108,12 +107,33 @@ function syncTitleUi(app) {
 let tracker = null;
 let lastGame = null;
 let lastState = null;
+let hookedHud = null;
+
+/**
+ * 図書室の「完全静音」は一瞬だけ立つ noiseWarned を毎フレーム監視せず、
+ * 実際にプレイヤーへ出た足音警告をイベントとしてラッチする。
+ * これなら同じフレーム内で noiseWarned が戻っても、一度聞かれた事実は失われない。
+ */
+function ensureHearingAlertHook(app) {
+  const hud = app?.hud;
+  if (!hud || hud === hookedHud) return;
+  hookedHud = hud;
+  const originalToast = hud.toast.bind(hud);
+  hud.toast = (text) => {
+    if (tracker?.stageId === 'library' && text === HEARING_ALERT_TEXT) {
+      tracker.heardAlert = true;
+    }
+    return originalToast(text);
+  };
+}
 
 function frame() {
   const app = window.__ningenkagu;
   const game = app?.game;
 
   if (game) {
+    ensureHearingAlertHook(app);
+
     if (game !== lastGame) {
       tracker = game.state === 'playing' ? makeTracker(game) : null;
       lastGame = game;
