@@ -1,6 +1,26 @@
 // STAGE 5: 理科室
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { ROOM, createBuilder } from '../stageBuilder.js';
+import { STAGE_EVENTS } from '../stageEvents.js';
+import { sfx } from '../audio.js';
+
+// 理科室は「視界のステージ」。実験器具から蒸気が噴き出すと、
+// 鬼の視界が大きく落ち、発生源にも気を取られる。白煙の時間が移動チャンスになる。
+STAGE_EVENTS.scienceroom = {
+  id: 'steam',
+  name: '蒸気が噴き出した！',
+  durationMin: 6.5,
+  durationMax: 8.5,
+  // 蒸気は部屋側の現象なので、鬼が途中でプレイヤーを怪しんでも視界低下は残す。
+  liftVisionOnBreak: false,
+  onStart(m) {
+    const rig = m.stage.eventRig || {};
+    m.applyVision({ range: 0.48, angle: 0.62, peri: 0.72, detect: 0.38 });
+    m.focusOni({ look: rig.look, spots: rig.spots, stand: 0.45, glance: 0.65 });
+    m.hud.eventNotice('🧪 蒸気が噴き出した！', '白煙の間に移動しろ');
+    sfx.inspectTell();
+  },
+};
 
 export function buildScienceRoom(scene) {
   const b = createBuilder(scene);
