@@ -7,7 +7,7 @@ import {
   initAudio, setMuted, isMuted,
   setBgmVolume, getBgmVolume, setSfxVolume, getSfxVolume,
 } from './audio.js';
-import { ONI_PERSONALITIES, setForcedOniPersonality, getForcedOniPersonality } from './oni.js';
+import { ONI_PERSONALITIES, setForcedOniPersonality, getForcedOniPersonality } from './oniPersonalities.js';
 import { STAGE_EVENTS } from './stageEvents.js';
 
 const MUTE_KEY = 'ningenkagu.muted';

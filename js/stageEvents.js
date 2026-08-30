@@ -5,7 +5,7 @@
 // ステージ4・5を足すときは STAGE_EVENTS に1項目書き足すだけでよい。
 import * as THREE from '../vendor/three/three.module.min.js';
 import { clamp, damp, randRange, prefersReducedMotion } from './utils.js';
-import { STATE } from './oni.js';
+import { STATE } from './oniConstants.js';
 import { sfx } from './audio.js';
 
 /** イベントの進行状態。二重発火を防ぐため、状態はここだけで持つ */

@@ -10,10 +10,11 @@
 // 「全部の軸で他より強い鬼」が生まれるのを防ぐ。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Oni } from '../../js/oni.js';
 import {
-  Oni, HEARING, ONI_PERSONALITIES,
+  HEARING, ONI_PERSONALITIES,
   pickOniPersonality, setForcedOniPersonality, getForcedOniPersonality,
-} from '../../js/oni.js';
+} from '../../js/oniPersonalities.js';
 
 function hear(player, loudness, tune = {}) {
   const stub = {
