@@ -34,6 +34,13 @@ test('図書室は擬態対象とイベント導線を持つ', () => {
   }
 });
 
+test('図書室は静かな部屋として足音の可聴距離が長い', () => {
+  const scene = new THREE.Scene();
+  const stage = buildLibrary(scene);
+  assert.equal(stage.hearingRangeScale, 1.45);
+  assert.ok(stage.hearingRangeScale > 1, '通常ステージより遠くまで足音が届くこと');
+});
+
 test('図書室のスポーン・巡回点・イベント立ち位置は家具の中に埋まらない', () => {
   const scene = new THREE.Scene();
   const stage = buildLibrary(scene);

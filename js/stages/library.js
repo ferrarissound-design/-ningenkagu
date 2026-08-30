@@ -105,6 +105,9 @@ export function buildLibrary(scene) {
   return {
     id: 'library',
     name: '図書室',
+    // 図書室は静かなので、同じ足音でも他ステージより遠くまで届く。
+    // 足音そのものの大きさは変えないため、しゃがみ移動の優位性が自然に強くなる。
+    hearingRangeScale: 1.45,
     group,
     occluders: b.occluders,
     solids: b.solids,
