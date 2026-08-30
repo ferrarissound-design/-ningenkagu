@@ -42,6 +42,7 @@ function makeTracker(game) {
     maxSuspicion: game.suspicion || 0,
     mimicKinds: new Set(),
     blackoutDistance: 0,
+    steamDistance: 0,
     heardAlert: false,
     lastX: p.x,
     lastZ: p.z,
@@ -55,8 +56,10 @@ function trackFrame(t, game) {
   if (target?.kind) t.mimicKinds.add(target.kind);
 
   const p = game.player.position;
-  if (t.stageId === 'artroom' && ACTIVE_PHASES.has(game.stageEvent?.phase)) {
-    t.blackoutDistance += Math.hypot(p.x - t.lastX, p.z - t.lastZ);
+  const moved = Math.hypot(p.x - t.lastX, p.z - t.lastZ);
+  if (ACTIVE_PHASES.has(game.stageEvent?.phase)) {
+    if (t.stageId === 'artroom') t.blackoutDistance += moved;
+    if (t.stageId === 'scienceroom') t.steamDistance += moved;
   }
   t.lastX = p.x;
   t.lastZ = p.z;
@@ -251,6 +254,7 @@ window.__ningenkaguMissions = {
     maxSuspicion: tracker.maxSuspicion,
     mimicKinds: [...tracker.mimicKinds],
     blackoutDistance: tracker.blackoutDistance,
+    steamDistance: tracker.steamDistance,
     heardAlert: tracker.heardAlert,
   } : null,
   oniProgress: {
