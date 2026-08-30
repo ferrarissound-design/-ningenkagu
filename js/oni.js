@@ -301,7 +301,10 @@ export class Oni {
     if (loudness <= 0) return { level: 0, x: p.x, z: p.z };
     const dx = p.x - this.root.position.x, dz = p.z - this.root.position.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
-    const range = HEARING.range * this.tune.detectFalloffScale;
+    // 静かなステージは stage.hearingRangeScale で可聴距離だけを伸ばす。
+    // 鬼の性格倍率は残すので、タイプごとの耳の良し悪しもそのまま生きる。
+    const stageRangeScale = this.stage?.hearingRangeScale ?? 1;
+    const range = HEARING.range * this.tune.detectFalloffScale * stageRangeScale;
     const falloff = clamp(1 - dist / range, 0, 1);
     return { level: loudness * falloff * this.tune.detectScale, x: p.x, z: p.z };
   }
