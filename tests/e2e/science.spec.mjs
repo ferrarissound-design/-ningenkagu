@@ -59,17 +59,16 @@ test.describe('STAGE 5 理科室', () => {
     expect(eventState.range).toBeLessThan(beforeRange);
     await expect(page.locator('#noticeText')).toContainText('蒸気が噴き出した');
 
-    // 実移動入力に依存させず、イベント中のフレーム間移動を決定的に再現する。
+    // 部屋外へ押し出される座標を使わず、上側の空いた通路上を2回移動する。
+    // これなら衝突補正が入ってもイベント中の実移動距離を安定して7m以上記録できる。
     await page.evaluate(() => {
-      const p = window.__ningenkagu.game.player.position;
-      p.x += 4;
+      window.__ningenkagu.game.player.position.set(0, 0, 5.0);
     });
-    await page.waitForTimeout(80);
+    await page.waitForTimeout(100);
     await page.evaluate(() => {
-      const p = window.__ningenkagu.game.player.position;
-      p.z += 3.5;
+      window.__ningenkagu.game.player.position.set(5.2, 0, 5.0);
     });
-    await page.waitForTimeout(80);
+    await page.waitForTimeout(100);
 
     const distance = await page.evaluate(() => window.__ningenkaguMissions.tracker()?.steamDistance || 0);
     expect(distance).toBeGreaterThanOrEqual(7);
