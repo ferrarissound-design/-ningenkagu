@@ -21,7 +21,7 @@ test.describe('STAGE 4 図書室', () => {
     await expect(page.locator('#selStageName')).toHaveText('図書室');
 
     expect(await page.evaluate(() => window.__ningenkagu.stages.map((s) => s.id)))
-      .toEqual(['living', 'classroom', 'artroom', 'library']);
+      .toEqual(['living', 'classroom', 'artroom', 'library', 'scienceroom']);
 
     await page.click('#btnStart');
     await page.waitForFunction(() => window.__ningenkagu.game.state === 'playing');

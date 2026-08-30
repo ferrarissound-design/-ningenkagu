@@ -12,7 +12,7 @@ async function waitForApp(page) {
 test.describe('鬼タイプ別クリア記録', () => {
   test('勝利したステージ×鬼タイプを保存し、タイトル進捗へ反映する', async ({ page }) => {
     await waitForApp(page);
-    await expect(page.locator('#selOniProgress')).toContainText('鬼攻略 0/12');
+    await expect(page.locator('#selOniProgress')).toContainText('鬼攻略 0/15');
 
     await page.click('#btnStart');
     await page.waitForFunction(() => !!window.__ningenkaguMissions.tracker());
@@ -27,25 +27,25 @@ test.describe('鬼タイプ別クリア記録', () => {
     expect(await page.evaluate(() => localStorage.getItem('ningenkagu.oniClear.living.watcher'))).toBe('1');
 
     await page.click('#btnResultTitle');
-    await expect(page.locator('#selOniProgress')).toContainText('鬼攻略 1/12');
+    await expect(page.locator('#selOniProgress')).toContainText('鬼攻略 1/15');
     await expect(page.locator('#selOniProgress')).toContainText('👁✓');
 
     const progress = await page.evaluate(() => window.__ningenkaguMissions.oniProgress.count());
-    expect(progress).toEqual({ cleared: 1, total: 12, complete: false });
+    expect(progress).toEqual({ cleared: 1, total: 15, complete: false });
   });
 
-  test('12組すべて攻略すると完全制覇を表示する', async ({ page }) => {
+  test('15組すべて攻略すると完全制覇を表示する', async ({ page }) => {
     await page.addInitScript(() => {
-      const stages = ['living', 'classroom', 'artroom', 'library'];
+      const stages = ['living', 'classroom', 'artroom', 'library', 'scienceroom'];
       const onis = ['watcher', 'charger', 'suspicious'];
       for (const stage of stages) {
         for (const oni of onis) localStorage.setItem(`ningenkagu.oniClear.${stage}.${oni}`, '1');
       }
-      localStorage.setItem('ningenkagu.stageIndex', '3');
+      localStorage.setItem('ningenkagu.stageIndex', '4');
     });
 
     await waitForApp(page);
-    await expect(page.locator('#selOniProgress')).toContainText('鬼攻略 12/12');
+    await expect(page.locator('#selOniProgress')).toContainText('鬼攻略 15/15');
     await expect(page.locator('#selOniProgress')).toContainText('👑 完全制覇');
     await expect(page.locator('#selOniProgress')).toContainText('👁✓ 💨✓ 🧐✓');
   });

@@ -26,6 +26,12 @@ export const MISSIONS = {
     desc: '足音で一度も鬼を警戒させずクリア',
     check(stats) { return !stats.heardAlert; },
   },
+  scienceroom: {
+    id: 'steam-runner',
+    name: '白煙突破',
+    desc: '蒸気発生中に7m以上移動してクリア',
+    check(stats) { return (stats.steamDistance ?? 0) >= 7; },
+  },
 };
 
 function mimicKindCount(stats) {
