@@ -1,7 +1,7 @@
 // エントリポイント：レンダラ・ライト・ゲームループ・UI配線
 import * as THREE from '../vendor/three/three.module.min.js';
 import { Game } from './game.js';
-import { Hud } from './hud.js';
+import { Hud, loadBestRank } from './hud.js';
 import { Input } from './input.js';
 import {
   initAudio, setMuted, isMuted,
@@ -231,6 +231,7 @@ function boot(renderer) {
   const gamepadStatus = document.getElementById('gamepadStatus');
   const selStageName = document.getElementById('selStageName');
   const selStageBest = document.getElementById('selStageBest');
+  const selStageRank = document.getElementById('selStageRank');
   const stageBtns = [...document.querySelectorAll('[data-stage]')];
   const cards = {
     info: document.getElementById('cardInfo'),
@@ -269,14 +270,17 @@ function boot(renderer) {
     for (const btn of stageBtns) {
       const i = Number(btn.dataset.stage);
       const locked = i > unlockedMax;
+      const bestRank = locked ? null : loadBestRank(STAGES[i].id);
       btn.disabled = locked;
-      btn.textContent = (locked ? '🔒 ' : '') + (i + 1) + '　' + STAGES[i].name;
+      btn.textContent = (locked ? '🔒 ' : '') + (i + 1) + '　' + STAGES[i].name
+        + (bestRank ? '　' + bestRank : '');
       btn.classList.toggle('on', i === stageIndex && !locked);
       btn.setAttribute('aria-pressed', String(i === stageIndex));
-      btn.title = locked ? '前のステージをクリアすると解放されます' : '';
+      btn.title = locked ? '前のステージをクリアすると解放されます' : (bestRank ? `ベストランク ${bestRank}` : '未クリア');
     }
     if (selStageName) selStageName.textContent = STAGES[stageIndex].name;
     if (selStageBest) selStageBest.textContent = hud.best.toLocaleString('en-US');
+    if (selStageRank) selStageRank.textContent = hud.bestRank || '-';
   }
 
   function loadStage(index) {
@@ -416,7 +420,7 @@ function boot(renderer) {
     return v;
   }
   function savePercent(key, v) {
-    try { localStorage.setItem(key, String(v)); } catch (e) { /* 保存できなくても続行 */ }
+    try { localStorage.setItem(key, String(v)); } catch (e) { /* noop */ }
   }
 
   function applyBgmVolume(pct, { persist = true } = {}) {
