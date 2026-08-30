@@ -1,6 +1,6 @@
 // 鬼の「足音の聞こえ方」と「性格タイプのバランス」のテスト。
 //
-// hearTarget() は Oni のメソッドだが、参照するのは root.position と tune だけなので
+// hearTarget() は Oni のメソッドだが、参照するのは root.position / tune / stage だけなので
 // THREE のシーンを組まずスタブの this で呼べる。
 //
 // 性格バランスのほうは README の設計意図
@@ -16,10 +16,11 @@ import {
   pickOniPersonality, setForcedOniPersonality, getForcedOniPersonality,
 } from '../../js/oniPersonalities.js';
 
-function hear(player, loudness, tune = {}) {
+function hear(player, loudness, tune = {}, stage = {}) {
   const stub = {
     root: { position: { x: 0, z: 0 } },
     tune: { detectFalloffScale: 1, detectScale: 1, ...tune },
+    stage,
   };
   return Oni.prototype.hearTarget.call(stub, { position: player }, loudness);
 }
@@ -69,6 +70,17 @@ test('見抜く力が弱い鬼は足音にも気づきにくい（detectScale）
   assert.ok(dull < normal, `雑な鬼のほうが小さく聞こえるはず（${dull} < ${normal}）`);
 });
 
+test('ステージの hearingRangeScale で足音だけ遠くまで届く', () => {
+  const d = HEARING.range * 1.2; // 通常ステージでは完全に範囲外
+  const normal = hear(at(d), 1).level;
+  const library = hear(at(d), 1, {}, { hearingRangeScale: 1.45 }).level;
+
+  assert.equal(normal, 0, '通常ステージでは聞こえない距離');
+  assert.ok(library > 0, `図書室相当なら聞こえるはず（${library} > 0）`);
+  assert.equal(hear(at(0), 1, {}, { hearingRangeScale: 1.45 }).level, 1,
+    '距離0での足音そのものの強さは増幅しない');
+});
+
 // ---------------- 性格タイプのバランス ----------------
 
 const PERSONAS = Object.values(ONI_PERSONALITIES);
@@ -115,7 +127,7 @@ test('どの性格タイプも、標準より優れた軸と劣った軸を最�
     const better = ADVANTAGE_AXES.filter((k) => p[k] > 1);
     const worse = ADVANTAGE_AXES.filter((k) => p[k] < 1);
     assert.ok(better.length > 0, `${p.name} に得意な軸がない`);
-    assert.ok(worse.length > 0, `${p.name} に弱点の軸がない`);
+    assert.ok(worse.length > 0, `${p.name} に弱点な軸がない`);
   }
 });
 
