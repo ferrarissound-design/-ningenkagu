@@ -19,7 +19,8 @@ const STAGE_KEY = 'ningenkagu.stageIndex';
 const STAGES = [
   { id: 'living', label: 'STAGE 1　リビング', name: 'リビング', clearNote: 'リビング突破！ 次は机とロッカーだらけの教室。鬼の巡回路も変わる。' },
   { id: 'classroom', label: 'STAGE 2　教室', name: '教室', clearNote: '教室突破！ 次は石膏像とイーゼルが並ぶ美術室。真っ白な像に紛れ込め。' },
-  { id: 'artroom', label: 'STAGE 3　美術室', name: '美術室', clearNote: '' },
+  { id: 'artroom', label: 'STAGE 3　美術室', name: '美術室', clearNote: '美術室突破！ 次は本棚が並ぶ図書室。書架の間を縫って逃げ切れ。' },
+  { id: 'library', label: 'STAGE 4　図書室', name: '図書室', clearNote: '' },
 ];
 
 // 各ステージの開始直後に「部屋の中が見える」構図を作る。
@@ -39,6 +40,11 @@ const START_VIEWS = {
   artroom: {
     position: [4.0, 0, -2.4],
     yaw: 2.15,
+    pitch: 0.48,
+  },
+  library: {
+    position: [-4.0, 0, 3.2],
+    yaw: -2.35,
     pitch: 0.48,
   },
 };
