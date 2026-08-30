@@ -115,6 +115,22 @@ export const STAGE_EVENTS = {
       }
     },
   },
+
+  // ---------------- STAGE 4：図書室 ----------------
+  library: {
+    id: 'bookfall',
+    name: '本が崩れた！',
+    durationMin: 6.0,
+    durationMax: 8.0,
+    liftVisionOnBreak: true,
+    onStart(m) {
+      const rig = m.stage.eventRig || {};
+      m.applyVision({ range: 0.62, angle: 0.78, peri: 0.82, detect: 0.5 });
+      m.focusOni({ look: rig.look, spots: rig.spots, stand: 0.4 });
+      m.hud.eventNotice('📚 本が崩れた！', '鬼が書架へ向かった');
+      sfx.eventBookfall();
+    },
+  },
 };
 
 /**
