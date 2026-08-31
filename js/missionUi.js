@@ -10,6 +10,19 @@ const HEARING_ALERT_TEXT = '足音が聞こえた…！';
 const ONI_META = Object.values(ONI_PERSONALITIES).map(({ id, name, icon }) => ({ id, name, icon }));
 const ONI_IDS = ONI_META.map((p) => p.id);
 
+/**
+ * タイトルの進行状況表示は毎フレーム呼ばれる。
+ * localStorage の読み出しは同期 I/O なので、素直に組むと 1 フレームあたり
+ * 20 回以上・毎秒 1000 回以上読むことになり、タイトル画面が重くなる。
+ * 記録が動いたときだけ番号を進め、変わっていないフレームは丸ごと省く。
+ */
+let progressRevision = 0;
+window.addEventListener('storage', () => { progressRevision++; });
+
+// Game を作り直すと main.js 側がステージボタンの文字を書き直す（★ が消える）。
+// タイトル表示を貼り直す必要があるので、作り直しも「変化」として数える。
+let gameRevision = 0;
+
 function loadCompleted(stageId) {
   try { return localStorage.getItem(KEY_PREFIX + stageId) === '1'; }
   catch (e) { return false; }
@@ -17,6 +30,7 @@ function loadCompleted(stageId) {
 
 function saveCompleted(stageId) {
   try { localStorage.setItem(KEY_PREFIX + stageId, '1'); } catch (e) { /* 保存できなくても続行 */ }
+  progressRevision++;
 }
 
 function loadOniClear(stageId, oniId) {
@@ -31,6 +45,8 @@ function saveOniClear(stageId, oniId) {
     return true;
   } catch (e) {
     return false;
+  } finally {
+    progressRevision++;
   }
 }
 
@@ -47,6 +63,16 @@ function makeTracker(game) {
     lastX: p.x,
     lastZ: p.z,
   };
+}
+
+/**
+ * ポーズ中は位置も統計も動かないので、再開時は最後の座標だけ合わせ直せばよい。
+ * トラッカーごと作り直すと、そのプレイで積み上げたミッション統計が消える。
+ */
+function syncTrackerPosition(t, game) {
+  const p = game.player.position;
+  t.lastX = p.x;
+  t.lastZ = p.z;
 }
 
 function trackFrame(t, game) {
@@ -146,12 +172,19 @@ function ensureTitleOniProgress() {
   return el;
 }
 
+let lastTitleSync = '';
+
 function syncTitleUi(app) {
   const game = app?.game;
   const stages = app?.stages;
   if (!game || !Array.isArray(stages)) return;
 
   const stageId = game.stage.id;
+  // ステージ選択・記録更新・ステージボタンの生成のいずれかが動いたときだけ描き直す
+  const stageBtns = document.querySelectorAll('[data-stage]');
+  const key = `${stageId}|${progressRevision}|${gameRevision}|${stages.length}|${stageBtns.length}`;
+  if (key === lastTitleSync) return;
+  lastTitleSync = key;
   const mission = MISSIONS[stageId];
   const el = ensureTitleMission();
   if (el && mission) {
@@ -175,7 +208,7 @@ function syncTitleUi(app) {
     progressEl.title = ONI_META.map((p) => `${p.icon} ${p.name}`).join(' / ');
   }
 
-  for (const btn of document.querySelectorAll('[data-stage]')) {
+  for (const btn of stageBtns) {
     const i = Number(btn.dataset.stage);
     const id = stages[i]?.id;
     if (!id) continue;
@@ -217,10 +250,17 @@ function frame() {
 
     if (game !== lastGame) {
       tracker = game.state === 'playing' ? makeTracker(game) : null;
+      gameRevision++;
       lastGame = game;
       lastState = game.state;
     } else {
-      if (game.state === 'playing' && lastState !== 'playing') tracker = makeTracker(game);
+      if (game.state === 'playing' && lastState !== 'playing') {
+        // ポーズからの再開は同じプレイの続き。ここで作り直すと
+        // 擬態した家具の種類・消灯中の移動距離・足音の有無がすべて 0 に戻り、
+        // 一時停止するだけでミッション判定をやり直せてしまう。
+        if (lastState === 'paused' && tracker && tracker.game === game) syncTrackerPosition(tracker, game);
+        else tracker = makeTracker(game);
+      }
 
       if (tracker && tracker.game === game) trackFrame(tracker, game);
 

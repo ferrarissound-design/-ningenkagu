@@ -17,9 +17,12 @@ STAGE_EVENTS.scienceroom = {
     const rig = m.stage.eventRig || {};
     m.applyVision({ range: 0.48, angle: 0.62, peri: 0.72, detect: 0.38 });
     m.focusOni({ look: rig.look, spots: rig.spots, stand: 0.45, glance: 0.65 });
+    m.setSteam(true);
     m.hud.eventNotice('🧪 蒸気が噴き出した！', '白煙の間に移動しろ');
-    sfx.inspectTell();
+    sfx.eventSteam();
   },
+  onUpdate(m, dt) { m.animateSteam(dt); },
+  onEnd(m) { m.setSteam(false); },
 };
 
 export function buildScienceRoom(scene) {
@@ -98,6 +101,31 @@ export function buildScienceRoom(scene) {
   addCyl(0.20, 0.42, STEAM_RIG.x, 0.21, STEAM_RIG.z, 0x8c9aa0, { seg: 14, roughness: 0.55, metalness: 0.25 });
   addSphere(0.18, STEAM_RIG.x, 0.54, STEAM_RIG.z, 0xb6c4c7, { roughness: 0.5, occluder: false });
 
+  // 噴き出す白煙。イベント中だけ表示する。
+  // occluders にも solids にも入れないので、視線も移動も邪魔しない
+  // （鬼の視界低下は stageEvents.js の倍率が担当する）。
+  // ジオメトリは1つを共有し、ステージ解放時は group ごと disposeStage が落とす。
+  const steamGroup = new THREE.Group();
+  steamGroup.visible = false;
+  group.add(steamGroup);
+  const puffGeo = new THREE.SphereGeometry(1, 10, 8);
+  const puffs = [];
+  const PUFF_COUNT = 8;
+  for (let i = 0; i < PUFF_COUNT; i++) {
+    const mesh = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({
+      color: 0xeef3f5, transparent: true, opacity: 0, depthWrite: false,
+    }));
+    mesh.position.set(STEAM_RIG.x, 0.6, STEAM_RIG.z);
+    steamGroup.add(mesh);
+    puffs.push({
+      mesh,
+      // 位相をずらして、途切れずに立ちのぼり続ける煙にする
+      phase: i / PUFF_COUNT,
+      driftX: Math.cos((i / PUFF_COUNT) * Math.PI * 2) * 0.42,
+      driftZ: Math.sin((i / PUFF_COUNT) * Math.PI * 2) * 0.42,
+    });
+  }
+
   return {
     id: 'scienceroom',
     name: '理科室',
@@ -107,6 +135,7 @@ export function buildScienceRoom(scene) {
     targets: b.targets,
     eventRig: {
       look: STEAM_RIG.clone(),
+      steam: { group: steamGroup, puffs, origin: STEAM_RIG.clone() },
       spots: [
         new THREE.Vector3(-2.0, 0, -3.0),
         new THREE.Vector3(2.0, 0, -3.0),

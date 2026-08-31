@@ -9,6 +9,7 @@ import {
 } from './audio.js';
 import { ONI_PERSONALITIES, setForcedOniPersonality, getForcedOniPersonality } from './oniPersonalities.js';
 import { STAGE_EVENTS } from './stageEvents.js';
+import { START_VIEWS } from './startViews.js';
 
 const MUTE_KEY = 'ningenkagu.muted';
 const BGM_VOLUME_KEY = 'ningenkagu.bgmVolume';
@@ -23,37 +24,6 @@ const STAGES = [
   { id: 'library', label: 'STAGE 4　図書室', name: '図書室', clearNote: '図書室突破！ 次は実験台と標本棚が並ぶ理科室。蒸気で鬼の視界が揺らぐ。' },
   { id: 'scienceroom', label: 'STAGE 5　理科室', name: '理科室', clearNote: '' },
 ];
-
-// 各ステージの開始直後に「部屋の中が見える」構図を作る。
-// 壁際スポーンのままだとカメラが壁に押されて極端に近くなるため、
-// 開始位置を少しだけ内側へ寄せ、カメラ前方が攻略エリアへ向くようにする。
-const START_VIEWS = {
-  living: {
-    position: [-4.8, 0, -3.2],
-    yaw: -2.20,
-    pitch: 0.48,
-  },
-  classroom: {
-    position: [-2.2, 0, 2.0],
-    yaw: -Math.PI / 4,
-    pitch: 0.48,
-  },
-  artroom: {
-    position: [4.0, 0, -2.4],
-    yaw: 2.15,
-    pitch: 0.48,
-  },
-  library: {
-    position: [-4.0, 0, 3.2],
-    yaw: -2.35,
-    pitch: 0.48,
-  },
-  scienceroom: {
-    position: [-4.6, 0, 3.6],
-    yaw: -2.25,
-    pitch: 0.48,
-  },
-};
 
 /** 前回クリアまで進んだステージから再開できるようにする */
 function loadSavedStageIndex() {
@@ -221,6 +191,7 @@ function boot(renderer) {
   const btnResultTitle = document.getElementById('btnResultTitle');
   const btnMimic = document.getElementById('btnMimic');
   const btnPose = document.getElementById('btnPose');
+  const btnDecoy = document.getElementById('btnDecoy');
   const btnPause = document.getElementById('pauseBtn');
   const muteBtn = document.getElementById('muteBtn');
   const resultNote = document.getElementById('resultNote');
@@ -392,6 +363,7 @@ function boot(renderer) {
   bindTap(btnResultTitle, returnToTitle);
   bindTap(btnMimic, () => input.pressMimic());
   bindTap(btnPose, () => input.pressPose());
+  bindTap(btnDecoy, () => input.pressDecoy());
   bindTap(btnPause, () => game.togglePause());
   bindTap(btnResume, () => game.resume());
   bindTap(btnHow, () => showCard('how'));
@@ -519,6 +491,8 @@ function boot(renderer) {
     if (input.enabled || e.repeat) return;
     if (e.code !== 'Enter' && e.code !== 'Space') return;
     if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
+    // あそびかた / 設定を開いている間は誤爆させない（ゲームパッドの確認ボタンと同じ扱い）
+    if (document.documentElement.classList.contains('title-card-open')) return;
     e.preventDefault();
     startFromCurrentScreen();
   });
