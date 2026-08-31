@@ -250,7 +250,7 @@ vendor/three/         Three.js r180 (MIT)
 アプリサーバーやビルド処理は不要ですが、ES モジュールを使うため `file://` ではなく HTTP で開いてください。
 
 ```sh
-python3 -m http.server 8000
+npm run serve
 # http://localhost:8000/
 ```
 

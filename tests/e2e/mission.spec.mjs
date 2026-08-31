@@ -36,11 +36,21 @@ test.describe('ステージ別ミッション', () => {
     await page.click('#btnStart');
     await page.waitForFunction(() => !!window.__ningenkaguMissions.tracker());
 
-    // 実ゲームが足音を聞き取ったときと同じHUD通知経路を通し、
-    // 一度でも警告された事実がラッチされることを決定的に検証する。
-    await page.evaluate(() => window.__ningenkagu.hud.toast('足音が聞こえた…！'));
+    // UI文言ではなくゲーム本体の聴覚判定から、警告済みの事実がラッチされることを検証する。
+    await page.evaluate(() => {
+      const { game, input } = window.__ningenkagu;
+      game.oni.hearTarget = () => ({
+        level: 1,
+        x: game.player.position.x,
+        z: game.player.position.z,
+      });
+      input.stick.x = 1;
+    });
     await page.waitForFunction(() => window.__ningenkaguMissions.tracker()?.heardAlert === true);
-    await page.evaluate(() => window.__ningenkagu.game.win());
+    await page.evaluate(() => {
+      window.__ningenkagu.input.stick.x = 0;
+      window.__ningenkagu.game.win();
+    });
 
     await expect(page.locator('#resultMission')).toHaveText('× 完全静音');
     expect(await page.evaluate(() => localStorage.getItem('ningenkagu.mission.library'))).toBeNull();

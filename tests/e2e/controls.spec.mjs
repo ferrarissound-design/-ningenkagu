@@ -36,8 +36,7 @@ test.describe('一時停止とミッション統計', () => {
     await page.click('#btnStart');
     await page.waitForFunction(() => !!window.__ningenkaguMissions.tracker());
 
-    // 実プレイと同じ経路で「擬態した家具の種類」を積む。
-    // トラッカーは毎フレーム1つずつ拾うので、1種類ごとに反映を待つ。
+    // 実プレイと同じ tryMimic() 経路で「擬態した家具の種類」を積む。
     const kinds = await page.evaluate(() => {
       const seen = [];
       for (const t of window.__ningenkagu.game.stage.targets) {
@@ -50,7 +49,8 @@ test.describe('一時停止とミッション統計', () => {
     for (const kind of kinds) {
       await page.evaluate((k) => {
         const g = window.__ningenkagu.game;
-        g.player.mimic(g.stage.targets.find((t) => t.kind === k));
+        g.nearTarget = g.stage.targets.find((t) => t.kind === k);
+        g.tryMimic();
       }, kind);
       await page.waitForFunction(
         (k) => window.__ningenkaguMissions.tracker()?.mimicKinds.includes(k),

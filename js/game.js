@@ -7,7 +7,7 @@ import { Oni } from './oni.js';
 import { STATE } from './oniConstants.js';
 import { HEARING, pickOniPersonality } from './oniPersonalities.js';
 import { Effects } from './effects.js';
-import { StageEventManager } from './stageEvents.js';
+import { StageEventManager, EVENT_PHASE } from './stageEvents.js';
 import { sfx } from './audio.js';
 import { setGameState } from './gameState.js';
 
@@ -119,6 +119,17 @@ export class Game {
     this.decoyCooldown = 0;
     this.decoyActive = false;
     this.decoyTimer = 0;
+    // ミッション判定に使うプレイ統計。
+    // ゲーム本体と同じフレームで記録し、UI文言や別のRAF監視に依存させない。
+    this.stats = {
+      game: this,
+      stageId: this.stage.id,
+      maxSuspicion: 0,
+      mimicKinds: new Set(),
+      blackoutDistance: 0,
+      steamDistance: 0,
+      heardAlert: false,
+    };
     this.player.reset(this.stage.playerSpawn);
     this.oni.reset();
     this.stageEvent.reset();
@@ -262,8 +273,21 @@ export class Game {
       }
     }
     const speed = CONFIG.speed[this.player.pose] ?? CONFIG.speed.stand;
+    const moveStartX = this.player.position.x;
+    const moveStartZ = this.player.position.z;
+    // このフレームの移動は stageEvent.update() より先に起きるため、
+    // 移動開始時点のフェーズを使う。開始前の一歩を足したり、終了直前の一歩を落とさない。
+    const eventPhaseDuringMove = this.stageEvent.phase;
     this.player.update(dt, this._move, speed * inputMag);
     resolveCollisions(this.player.position, this.player.radius, this.stage.solids);
+    const moved = Math.hypot(
+      this.player.position.x - moveStartX,
+      this.player.position.z - moveStartZ,
+    );
+    if (eventPhaseDuringMove === EVENT_PHASE.ACTIVE || eventPhaseDuringMove === EVENT_PHASE.WARNING) {
+      if (this.stage.id === 'artroom') this.stats.blackoutDistance += moved;
+      if (this.stage.id === 'scienceroom') this.stats.steamDistance += moved;
+    }
 
     // --- ステージ固有イベント ---
     // 鬼の視界補正を先に反映させるため、視界判定より前に進める
@@ -334,6 +358,7 @@ export class Game {
       sense.hz = heard.z;
       if (heard.level > 0) this.suspicion = clamp(this.suspicion + CONFIG.noise.gain * heard.level * heard.level * dt, 0, 1);
       if (heard.level >= HEARING.alertLevel) {
+        this.stats.heardAlert = true;
         if (!this.noiseWarned) { this.noiseWarned = true; this.hud.toast('足音が聞こえた…！'); }
       } else {
         this.noiseWarned = false;
@@ -346,6 +371,7 @@ export class Game {
     this.oni.updateConeShape(dt, this.stage.occluders);
     this.updateInspect(dt);
     this.updateDecoy(dt);
+    this.stats.maxSuspicion = Math.max(this.stats.maxSuspicion, this.suspicion);
 
     // 目の前で見つめられても正体がバレなければ「見逃し」ボーナス
     // （検査ボーナスと二重に出さないよう、検査中はためない）
@@ -515,6 +541,7 @@ export class Game {
       return;
     }
     this.player.mimic(t);
+    this.stats.mimicKinds.add(t.kind);
     this.fx.burst(this.player.position, t.color);
     this.hud.popup(t.label + 'に擬態！', 'good');
     sfx.mimic();
