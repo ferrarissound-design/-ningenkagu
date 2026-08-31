@@ -153,6 +153,12 @@ export const sfx = {
     tone(1700, 0.04, { type: 'square', gain: 0.05 });
     tone(2300, 0.05, { type: 'square', gain: 0.04, delay: 0.05 });
   },
+  /** 蒸気：高い方から下がっていく「シューッ」という噴出音 */
+  eventSteam() {
+    tone(2600, 0.55, { type: 'sawtooth', gain: 0.035, slideTo: 900 });
+    tone(1750, 0.62, { type: 'triangle', gain: 0.03, slideTo: 700, delay: 0.04 });
+    tone(320, 0.28, { type: 'sine', gain: 0.04, slideTo: 190, delay: 0.02 });
+  },
   /** 本が崩れる：ドサッという低い音の後、パラパラと数回鳴らす */
   eventBookfall() {
     tone(160, 0.22, { type: 'square', gain: 0.1, slideTo: 80 });

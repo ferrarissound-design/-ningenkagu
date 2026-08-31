@@ -178,6 +178,7 @@ export class StageEventManager {
     this.flicker = 0;
     this.phase = EVENT_PHASE.IDLE;
     this.setTv(false);
+    this.setSteam(false);
     this.dim = 0;
     this.dimTarget = 0;
     this.applyLights();
@@ -421,6 +422,47 @@ export class StageEventManager {
     } else {
       mat.emissive.setHex(0x000000);
       mat.emissiveIntensity = 1;
+    }
+  }
+
+  /**
+   * 理科室の白煙の ON / OFF。
+   * 3Dオブジェクトはステージ側（eventRig.steam）が持っているので、
+   * ここは表示切替とアニメーションだけを担当する。
+   */
+  setSteam(on) {
+    const rig = this.stage.eventRig && this.stage.eventRig.steam;
+    if (!rig) return;
+    this.steamOn = on;
+    rig.group.visible = on;
+    if (on) {
+      this.steamPhase = 0;
+    } else {
+      // 消すときは必ず透明へ戻す（次の発生が前回の濃さから始まらないように）
+      for (const p of rig.puffs) p.mesh.material.opacity = 0;
+    }
+  }
+
+  /** 白煙が立ちのぼって薄れていくループ。位相をずらして途切れさせない */
+  animateSteam(dt) {
+    const rig = this.stage.eventRig && this.stage.eventRig.steam;
+    if (!rig || !this.steamOn) return;
+    this.steamPhase = (this.steamPhase || 0) + dt * 0.42;
+    // 終わりぎわは全体を薄くして、点灯イベントと同じく「戻る」予感を出す
+    const left = this.duration - this.elapsed;
+    const fade = clamp(Math.min(this.elapsed / 0.8, left / 1.2), 0, 1);
+    for (const p of rig.puffs) {
+      const t = (this.steamPhase + p.phase) % 1;
+      const mesh = p.mesh;
+      mesh.position.set(
+        rig.origin.x + p.driftX * t,
+        0.6 + t * 1.9,
+        rig.origin.z + p.driftZ * t
+      );
+      const s = 0.22 + t * 0.72;
+      mesh.scale.set(s, s * 0.85, s);
+      // 出た直後に濃くなり、上がりきるほど薄れる
+      mesh.material.opacity = 0.5 * Math.sin(Math.PI * Math.min(1, t * 1.15)) * fade;
     }
   }
 
