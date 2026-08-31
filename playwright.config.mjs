@@ -9,6 +9,7 @@ const executablePath = existsSync(PINNED_CHROMIUM) ? PINNED_CHROMIUM : undefined
 
 export default defineConfig({
   testDir: './tests/e2e',
+  globalSetup: './tests/e2e/global-setup.mjs',
   timeout: 30_000,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
@@ -23,12 +24,6 @@ export default defineConfig({
       executablePath,
       args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'],
     },
-  },
-  webServer: {
-    command: 'python3 -m http.server 8123',
-    url: 'http://127.0.0.1:8123/index.html',
-    reuseExistingServer: !process.env.CI,
-    timeout: 15_000,
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

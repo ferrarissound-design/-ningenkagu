@@ -475,6 +475,13 @@ function boot(renderer) {
       input.setEnabled(false);
       uiEl.classList.remove('playing');
       const hasNext = game.state === 'win' && stageIndex < STAGES.length - 1;
+      // クリアした時点で次の面を解放する。
+      // 「次のステージへ」を押さずタイトルへ戻っても、進行が失われないようにする。
+      if (hasNext) {
+        unlockedMax = Math.max(unlockedMax, stageIndex + 1);
+        saveStageIndex(unlockedMax);
+        syncStageUi();
+      }
       if (btnRetry) {
         btnRetry.textContent = hasNext
           ? '次のステージへ'

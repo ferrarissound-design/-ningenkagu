@@ -59,16 +59,24 @@ test.describe('STAGE 5 理科室', () => {
     expect(eventState.range).toBeLessThan(beforeRange);
     await expect(page.locator('#noticeText')).toContainText('蒸気が噴き出した');
 
-    // 部屋外へ押し出される座標を使わず、上側の空いた通路上を2回移動する。
-    // これなら衝突補正が入ってもイベント中の実移動距離を安定して7m以上記録できる。
+    // 上側の空いた通路を実際の入力経路で走り、ゲーム本体が移動距離を記録することを確認する。
     await page.evaluate(() => {
-      window.__ningenkagu.game.player.position.set(0, 0, 5.0);
+      const { game } = window.__ningenkagu;
+      game.player.position.set(-4.5, 0, 5.0);
+      game.camYaw = 0;
+      game.oni.senseTarget = () => ({ visible: false, dist: 99, centrality: 0, fraction: 0, peripheral: false });
     });
     await page.waitForTimeout(100);
     await page.evaluate(() => {
-      window.__ningenkagu.game.player.position.set(5.2, 0, 5.0);
+      window.__ningenkagu.input.stick.x = 1;
     });
-    await page.waitForTimeout(100);
+    await page.waitForFunction(
+      () => (window.__ningenkaguMissions.tracker()?.steamDistance || 0) >= 7,
+      null,
+      // SwiftShader環境ではゲーム内時間が実時間より遅く進むことがある。
+      { timeout: 15_000 },
+    );
+    await page.evaluate(() => { window.__ningenkagu.input.stick.x = 0; });
 
     const distance = await page.evaluate(() => window.__ningenkaguMissions.tracker()?.steamDistance || 0);
     expect(distance).toBeGreaterThanOrEqual(7);
@@ -91,5 +99,18 @@ test.describe('STAGE 5 理科室', () => {
     await page.click('#btnRetry');
     await page.waitForFunction(() => window.__ningenkagu.game.stage.id === 'scienceroom');
     expect(await page.evaluate(() => localStorage.getItem('ningenkagu.stageIndex'))).toBe('4');
+  });
+
+  test('クリア後にタイトルへ戻っても次のステージが解放済みになる', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    await page.click('#btnStart');
+    await page.evaluate(() => window.__ningenkagu.game.win());
+    await page.click('#btnResultTitle');
+
+    await expect(page.locator('[data-stage="1"]')).toBeEnabled();
+    await expect(page.locator('[data-stage="1"]')).not.toContainText('🔒');
+    expect(await page.evaluate(() => localStorage.getItem('ningenkagu.stageIndex'))).toBe('1');
   });
 });

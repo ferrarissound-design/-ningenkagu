@@ -5,8 +5,6 @@ import { ONI_PERSONALITIES } from './oniPersonalities.js';
 import { oniClearKey, countOniClears, stageOniClears } from './oniProgress.js';
 
 const KEY_PREFIX = 'ningenkagu.mission.';
-const ACTIVE_PHASES = new Set(['active', 'warning']);
-const HEARING_ALERT_TEXT = '足音が聞こえた…！';
 const ONI_META = Object.values(ONI_PERSONALITIES).map(({ id, name, icon }) => ({ id, name, icon }));
 const ONI_IDS = ONI_META.map((p) => p.id);
 
@@ -51,44 +49,7 @@ function saveOniClear(stageId, oniId) {
 }
 
 function makeTracker(game) {
-  const p = game.player.position;
-  return {
-    game,
-    stageId: game.stage.id,
-    maxSuspicion: game.suspicion || 0,
-    mimicKinds: new Set(),
-    blackoutDistance: 0,
-    steamDistance: 0,
-    heardAlert: false,
-    lastX: p.x,
-    lastZ: p.z,
-  };
-}
-
-/**
- * ポーズ中は位置も統計も動かないので、再開時は最後の座標だけ合わせ直せばよい。
- * トラッカーごと作り直すと、そのプレイで積み上げたミッション統計が消える。
- */
-function syncTrackerPosition(t, game) {
-  const p = game.player.position;
-  t.lastX = p.x;
-  t.lastZ = p.z;
-}
-
-function trackFrame(t, game) {
-  t.maxSuspicion = Math.max(t.maxSuspicion, game.suspicion || 0);
-
-  const target = game.player.mimicTarget;
-  if (target?.kind) t.mimicKinds.add(target.kind);
-
-  const p = game.player.position;
-  const moved = Math.hypot(p.x - t.lastX, p.z - t.lastZ);
-  if (ACTIVE_PHASES.has(game.stageEvent?.phase)) {
-    if (t.stageId === 'artroom') t.blackoutDistance += moved;
-    if (t.stageId === 'scienceroom') t.steamDistance += moved;
-  }
-  t.lastX = p.x;
-  t.lastZ = p.z;
+  return game.stats;
 }
 
 function ensureResultMission() {
@@ -221,33 +182,11 @@ function syncTitleUi(app) {
 let tracker = null;
 let lastGame = null;
 let lastState = null;
-let hookedHud = null;
-
-/**
- * 図書室の「完全静音」は一瞬だけ立つ noiseWarned を毎フレーム監視せず、
- * 実際にプレイヤーへ出た足音警告をイベントとしてラッチする。
- * これなら同じフレーム内で noiseWarned が戻っても、一度聞かれた事実は失われない。
- */
-function ensureHearingAlertHook(app) {
-  const hud = app?.hud;
-  if (!hud || hud === hookedHud) return;
-  hookedHud = hud;
-  const originalToast = hud.toast.bind(hud);
-  hud.toast = (text) => {
-    if (tracker?.stageId === 'library' && text === HEARING_ALERT_TEXT) {
-      tracker.heardAlert = true;
-    }
-    return originalToast(text);
-  };
-}
-
 function frame() {
   const app = window.__ningenkagu;
   const game = app?.game;
 
   if (game) {
-    ensureHearingAlertHook(app);
-
     if (game !== lastGame) {
       tracker = game.state === 'playing' ? makeTracker(game) : null;
       gameRevision++;
@@ -255,14 +194,10 @@ function frame() {
       lastState = game.state;
     } else {
       if (game.state === 'playing' && lastState !== 'playing') {
-        // ポーズからの再開は同じプレイの続き。ここで作り直すと
-        // 擬態した家具の種類・消灯中の移動距離・足音の有無がすべて 0 に戻り、
-        // 一時停止するだけでミッション判定をやり直せてしまう。
-        if (lastState === 'paused' && tracker && tracker.game === game) syncTrackerPosition(tracker, game);
-        else tracker = makeTracker(game);
+        // ポーズからの再開は同じプレイの統計をそのまま使う。
+        // リトライ時は Game.reset() が新しい stats を作るため、参照を取り直す。
+        if (lastState !== 'paused' || !tracker || tracker !== game.stats) tracker = makeTracker(game);
       }
-
-      if (tracker && tracker.game === game) trackFrame(tracker, game);
 
       if (tracker && lastState === 'playing' && (game.state === 'win' || game.state === 'lose')) {
         const won = game.state === 'win';
