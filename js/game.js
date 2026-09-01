@@ -130,6 +130,11 @@ export class Game {
       steamDistance: 0,
       heardAlert: false,
     };
+    // 前のプレイで指していた擬態対象を持ち越さない。
+    // update() は「前フレームに拾った nearTarget」で擬態するため、
+    // ここを消しておかないとリトライ直後の1フレームだけ古い対象が生きてしまう。
+    this.nearTarget = null;
+    this.fx.hideMarker();
     this.player.reset(this.stage.playerSpawn);
     this.oni.reset();
     this.stageEvent.reset();
@@ -254,6 +259,8 @@ export class Game {
     if (input.consumeMimic()) this.tryMimic();
     if (input.consumeDecoy()) this.tryDecoy();
     if (this.decoyCooldown > 0) this.decoyCooldown = Math.max(0, this.decoyCooldown - dt);
+    // クールダウン中はボタンを無効化する（HUD 側で変化があったときだけ書き換える）
+    this.hud.setDecoy(this.decoyUses, this.decoyCooldown > 0);
 
     // --- 移動 ---
     const mv = input.move;
@@ -284,6 +291,9 @@ export class Game {
       this.player.position.x - moveStartX,
       this.player.position.z - moveStartZ,
     );
+    // 壁や家具に押しつけている間は実際には動いていない。
+    // 足音・静止度・家具検査の判定を、押し戻したあとの実移動量へ合わせる。
+    this.player.applyResolvedMovement(dt, moved);
     if (eventPhaseDuringMove === EVENT_PHASE.ACTIVE || eventPhaseDuringMove === EVENT_PHASE.WARNING) {
       if (this.stage.id === 'artroom') this.stats.blackoutDistance += moved;
       if (this.stage.id === 'scienceroom') this.stats.steamDistance += moved;
@@ -363,6 +373,11 @@ export class Game {
       } else {
         this.noiseWarned = false;
       }
+    } else {
+      // 家具検査・イベント中は足音を見ないので、聞こえ具合も下がらない。
+      // ここで戻しておかないと、通常の巡回に復帰したあと
+      // 「足音が聞こえた…！」が二度と出なくなる。
+      this.noiseWarned = false;
     }
 
     // --- 鬼の更新 ---

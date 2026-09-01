@@ -59,6 +59,31 @@ test('disposeObject3D disposes every material and its textures in a multi-materi
   assert.ok(mat1Disposed && mat2Disposed);
 });
 
+test('disposeObject3D keeps the shared sprite geometry but frees its material', () => {
+  // three.js の Sprite は全スプライトで1枚のジオメトリを共有している。
+  // 鬼を捨てるたびにこれを dispose すると、生きている他のスプライトの
+  // GPU バッファまで落ちてしまう。
+  const tex = new THREE.Texture({ width: 1, height: 1 });
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+  const other = new THREE.Sprite(new THREE.SpriteMaterial());
+  assert.equal(sprite.geometry, other.geometry, '前提：ジオメトリは共有されている');
+
+  let geoDisposed = 0;
+  let matDisposed = 0;
+  let texDisposed = 0;
+  sprite.geometry.dispose = () => { geoDisposed++; };
+  sprite.material.dispose = () => { matDisposed++; };
+  tex.dispose = () => { texDisposed++; };
+
+  const root = new THREE.Group();
+  root.add(sprite);
+  disposeObject3D(root);
+
+  assert.equal(geoDisposed, 0, '共有ジオメトリには触れない');
+  assert.equal(matDisposed, 1, 'マテリアルはスプライトごとの持ち物なので解放する');
+  assert.equal(texDisposed, 1, '「？」「！」のテクスチャも解放する');
+});
+
 test('disposeObject3D removes the root from its parent', () => {
   const parent = new THREE.Group();
   const child = new THREE.Group();

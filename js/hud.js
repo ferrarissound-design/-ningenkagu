@@ -87,6 +87,7 @@ export class Hud {
     this._noticeTimer = null;
     this._personaTimer = null;
     this._lastDecoy = -1;
+    this._lastDecoyOff = null;
     this._lastTime = -1;
     this._lastScore = -1;
     this._lastAlertCls = '';
@@ -174,12 +175,19 @@ export class Hud {
     this.elPose.textContent = POSE_LABEL[pose] || '';
   }
 
-  /** 残りおとり回数。0になったらボタンごと無効化する */
-  setDecoy(remaining) {
-    if (remaining === this._lastDecoy) return;
-    this._lastDecoy = remaining;
-    if (this.elDecoyHint) this.elDecoyHint.textContent = 'R ×' + remaining;
-    if (this.elBtnDecoy) this.elBtnDecoy.disabled = remaining <= 0;
+  /**
+   * 残りおとり回数。使い切ったときと、連発できないクールダウン中は
+   * ボタンごと無効化して「今は押しても無駄」だと見た目で分かるようにする。
+   */
+  setDecoy(remaining, cooling = false) {
+    if (remaining !== this._lastDecoy) {
+      this._lastDecoy = remaining;
+      if (this.elDecoyHint) this.elDecoyHint.textContent = 'R ×' + remaining;
+    }
+    const off = remaining <= 0 || !!cooling;
+    if (off === this._lastDecoyOff) return;
+    this._lastDecoyOff = off;
+    if (this.elBtnDecoy) this.elBtnDecoy.disabled = off;
   }
 
   setStealth(v) {
@@ -398,6 +406,8 @@ export class Hud {
   }
 
   resetVisuals() {
+    this._lastDecoy = -1;
+    this._lastDecoyOff = null;
     this._lastTime = -1;
     this._lastScore = -1;
     this._lastAlertCls = '';

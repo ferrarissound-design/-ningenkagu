@@ -505,10 +505,13 @@ function boot(renderer) {
   });
 
   // スクロール・ピンチズームの抑止。
-  // タイトルの「あそびかた / 設定」カード内はネイティブの縦スクロールに任せる
-  // （そちらは css/style.css 側で touch-action: pan-y を許可している）。
+  // タイトルの「あそびかた / 設定」カードと、タイトル / ポーズ / リザルトの
+  // オーバーレイ（.screen）内はネイティブの縦スクロールに任せる。
+  // 横持ちスマホではリザルトのパネルが1画面に収まらないことがあり、
+  // ここまで止めてしまうと下のボタンへ指が届かなくなる。
+  // （そちらは css/style.css 側で touch-action: pan-y を許可している）
   document.addEventListener('touchmove', (e) => {
-    if (e.target.closest('.tcard')) return;
+    if (e.target.closest('.tcard, .screen')) return;
     e.preventDefault();
   }, { passive: false });
   document.addEventListener('gesturestart', (e) => e.preventDefault());
