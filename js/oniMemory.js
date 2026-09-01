@@ -111,3 +111,54 @@ export class OniMemory {
 
   info() { return { ...this.current, personalityId: this.personalityId }; }
 }
+
+/**
+ * Oni 本体を大きく太らせずに記憶を差し込むミックスイン。
+ * oni.js は最後に applyInspectBehavior(Oni.prototype) を呼ぶため、そこで一緒に適用する。
+ */
+export function applyOniMemoryBehavior(OniProto) {
+  if (OniProto.__oniMemoryApplied) return;
+  Object.defineProperty(OniProto, '__oniMemoryApplied', { value: true, configurable: true });
+
+  const baseApplyPersonality = OniProto.applyPersonality;
+  OniProto.applyPersonality = function applyPersonalityWithMemory(id) {
+    if (!this.memory) this.memory = new OniMemory(id);
+    const personality = baseApplyPersonality.call(this, id);
+    this.memory.setPersonality(personality.id);
+    this.baseInspectChance = this.inspectChance;
+    this.memoryDetectScale = 1;
+    return personality;
+  };
+
+  const baseReset = OniProto.reset;
+  OniProto.reset = function resetWithMemory() {
+    if (this.memory) this.memory.reset();
+    this.memoryDetectScale = 1;
+    if (typeof this.baseInspectChance === 'number') this.inspectChance = this.baseInspectChance;
+    return baseReset.call(this);
+  };
+
+  const baseSenseTarget = OniProto.senseTarget;
+  OniProto.senseTarget = function senseTargetWithMemory(player, occluders) {
+    if (this.memory) {
+      const remembered = this.memory.observe(player?.mimicTarget ?? null);
+      this.memoryDetectScale = remembered.detectScale;
+      const baseChance = this.baseInspectChance ?? this.inspectChance;
+      this.inspectChance = Math.min(0.9, Math.max(0.05, baseChance * remembered.inspectScale));
+    }
+    return baseSenseTarget.call(this, player, occluders);
+  };
+
+  // game.js はこの getter を「ステージイベント中の見抜く力」として既に参照する。
+  // そこへ記憶倍率だけ合成することで、足音の detectScale には影響させない。
+  Object.defineProperty(OniProto, 'eventDetectScale', {
+    configurable: true,
+    get() {
+      return this.eventVision.detect * (this.memoryDetectScale ?? 1);
+    },
+  });
+
+  OniProto.memoryInfo = function memoryInfo() {
+    return this.memory ? this.memory.info() : neutral();
+  };
+}
