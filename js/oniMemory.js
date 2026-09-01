@@ -70,6 +70,7 @@ export class OniMemory {
    */
   observe(target) {
     if (!target) {
+      this.lastTarget = null;
       this.current = neutral();
       return this.current;
     }
@@ -140,13 +141,20 @@ export function applyOniMemoryBehavior(OniProto) {
 
   const baseSenseTarget = OniProto.senseTarget;
   OniProto.senseTarget = function senseTargetWithMemory(player, occluders) {
-    if (this.memory) {
+    const result = baseSenseTarget.call(this, player, occluders);
+    const baseChance = this.baseInspectChance ?? this.inspectChance;
+
+    // 「鬼の記憶」なので、実際に視界が通ったときだけ覚える。
+    // 壁の向こうで家具を渡り歩いても、鬼にはその履歴は分からない。
+    if (this.memory && result.visible) {
       const remembered = this.memory.observe(player?.mimicTarget ?? null);
       this.memoryDetectScale = remembered.detectScale;
-      const baseChance = this.baseInspectChance ?? this.inspectChance;
       this.inspectChance = Math.min(0.9, Math.max(0.05, baseChance * remembered.inspectScale));
+    } else {
+      this.memoryDetectScale = 1;
+      if (typeof baseChance === 'number') this.inspectChance = baseChance;
     }
-    return baseSenseTarget.call(this, player, occluders);
+    return result;
   };
 
   // game.js はこの getter を「ステージイベント中の見抜く力」として既に参照する。
