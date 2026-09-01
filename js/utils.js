@@ -84,7 +84,10 @@ function disposeMaterial(material) {
 export function disposeObject3D(root) {
   if (!root) return;
   root.traverse((obj) => {
-    if (obj.geometry) obj.geometry.dispose();
+    // Sprite のジオメトリは three.js が全スプライトで共有している1枚板なので、
+    // ここで dispose すると生きている他のスプライトのGPUバッファまで落ちる。
+    // 自前で作ったジオメトリだけを解放する。
+    if (obj.geometry && !obj.isSprite) obj.geometry.dispose();
     const material = obj.material;
     if (!material) return;
     if (Array.isArray(material)) material.forEach(disposeMaterial);

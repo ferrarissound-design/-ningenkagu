@@ -78,6 +78,10 @@ test.describe('起動', () => {
 
 test.describe('GPUリソースの解放', () => {
   test('ステージ切替とタイトル復帰を繰り返してもジオメトリ・テクスチャが増え続けない', async ({ page }) => {
+    // 18回ぶんのステージ作り直し（部屋一式の生成と解放）を実際に通すため、
+    // ソフトウェアGLのCIでは既定の30秒にぎりぎり収まらないことがある。
+    // 検査内容は変えず、この1本だけ時間を多めに取る。
+    test.slow();
     await page.goto('/index.html');
     await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
     await page.waitForTimeout(400); // 初期シーンの構築が落ち着くのを待つ

@@ -18,6 +18,11 @@ test.describe('画面上の操作ボタン', () => {
     await page.click('#btnDecoy');
     await page.waitForFunction(() => window.__ningenkagu.game.decoyUses === 1, null, { timeout: 5_000 });
     await expect(page.locator('#decoyHint')).toHaveText('R ×1');
+
+    // 連発できない間はボタンごと無効化して「今は押せない」と見せる
+    await expect(page.locator('#btnDecoy')).toBeDisabled();
+    await page.evaluate(() => { window.__ningenkagu.game.decoyCooldown = 0; });
+    await expect(page.locator('#btnDecoy')).toBeEnabled();
   });
 
   test('擬態・ポーズボタンも同じ経路で効く', async ({ page }) => {

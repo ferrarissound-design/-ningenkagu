@@ -10,6 +10,9 @@ export const POSE_LABEL = {
   crouch: 'しゃがみ',
 };
 
+/** これ未満の速度は「止まっている」とみなす（静止度・足音の判定に使う） */
+export const STILL_SPEED = 0.1;
+
 const CREAM = 0xffdfb5;
 const MINT = 0x49c9a9;
 const MINT_DARK = 0x247f78;
@@ -136,6 +139,7 @@ export class Player {
     this.speed = 0;
     this.yaw = 0;
     this.stillTime = 0;
+    this._stillTimeBefore = 0;
     this.flash = 0;
     this.faceScale = 1;
     this.faceTarget = 1;
@@ -162,6 +166,7 @@ export class Player {
     this.walkPhase = 0;
     this.idlePhase = 0;
     this.stillTime = 0;
+    this._stillTimeBefore = 0;
     this.speed = 0;
     this.flash = 0;
     this.faceScale = 1;
@@ -208,6 +213,8 @@ export class Player {
   /** 移動と姿勢の更新 */
   update(dt, moveDir, moveSpeed) {
     this.idlePhase += dt;
+    // 衝突で押し戻されたときに静止時間を積み直せるよう、更新前の値を控えておく
+    this._stillTimeBefore = this.stillTime;
     const moving = moveDir.lengthSq() > 0.0001;
     if (moving) {
       this.root.position.x += moveDir.x * moveSpeed * dt;
@@ -224,7 +231,7 @@ export class Player {
       this.walkPhase += dt * moveSpeed * 3.2;
     } else {
       this.speed = damp(this.speed, 0, 14, dt);
-      if (this.speed < 0.1) this.speed = 0;
+      if (this.speed < STILL_SPEED) this.speed = 0;
       this.stillTime += dt;
       this.walkPhase = damp(this.walkPhase, Math.round(this.walkPhase / Math.PI) * Math.PI, 8, dt);
     }
@@ -262,6 +269,26 @@ export class Player {
       const e = this.flash * this.flash * 0.9;
       for (const m of this.materials) m.emissive.setRGB(e * 0.6, e, e * 0.8);
     }
+  }
+
+  /**
+   * 衝突判定で押し戻された分を速度・静止時間へ反映する。
+   *
+   * update() は「入力どおりに進めたはずの速度」を入れるが、壁や家具に
+   * 押しつけている間は resolveCollisions() が移動をまるごと打ち消す。
+   * その差を直さないと、実際には1ミリも動いていないのに足音が鳴り、
+   * 静止度が0のままになり、家具検査でも「動いた」と判定されてしまう。
+   *
+   * @param {number} dt このフレームの経過秒
+   * @param {number} moved 衝突解決まで済ませた実際の移動距離
+   */
+  applyResolvedMovement(dt, moved) {
+    if (dt <= 0) return;
+    const actual = moved / dt;
+    if (actual >= this.speed) return; // 押し戻されていない
+    this.speed = actual < STILL_SPEED ? 0 : actual;
+    // 実際には止まっているなら、押しつける直前までの静止時間を引き継ぐ
+    if (this.speed === 0) this.stillTime = (this._stillTimeBefore ?? 0) + dt;
   }
 
   /** 見つかった瞬間、顔が飛び出して体が驚いた形に潰れる */
