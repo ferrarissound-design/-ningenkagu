@@ -3,8 +3,12 @@
 // メソッド内の this は通常どおり呼び出し元の Oni インスタンスを指す。
 import { clamp, damp, randRange, angleDelta } from './utils.js';
 import { STATE, INSPECT } from './oniConstants.js';
+import { applyOniMemoryBehavior } from './oniMemory.js';
 
 export function applyInspectBehavior(OniProto) {
+  // oni.js はここを必ず通るので、家具検査と同じミックスイン方式で短期記憶も有効にする。
+  applyOniMemoryBehavior(OniProto);
+
   Object.assign(OniProto, {
     /** 検査の1動作を作る。s は残り時間が少ないときの短縮率 */
     makeInspectAct(kind, s) {
