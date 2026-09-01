@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { OniMemory } from '../../js/oniMemory.js';
+import { OniMemory, applyOniMemoryBehavior } from '../../js/oniMemory.js';
 
 const furniture = (kind, label) => ({ kind, label });
 
@@ -80,4 +80,34 @@ test('reset makes the oni forget the previous round', () => {
   assert.equal(fresh.targetUses, 1);
   assert.equal(fresh.detectScale, 1);
   assert.equal(fresh.remembered, false);
+});
+
+test('oni behavior remembers only disguises that were actually visible', () => {
+  const proto = {
+    applyPersonality(id) {
+      this.inspectChance = 0.4;
+      return { id };
+    },
+    reset() {},
+    senseTarget(player) { return { visible: !!player.visible }; },
+  };
+  applyOniMemoryBehavior(proto);
+
+  const oni = Object.create(proto);
+  oni.eventVision = { detect: 1 };
+  oni.applyPersonality('watcher');
+  oni.reset();
+
+  const sofa = furniture('sofa', 'ソファ');
+  const shelf = furniture('shelf', '棚');
+
+  oni.senseTarget({ mimicTarget: sofa, visible: true });
+  oni.senseTarget({ mimicTarget: shelf, visible: false });
+  oni.senseTarget({ mimicTarget: sofa, visible: true });
+  assert.equal(oni.eventDetectScale, 1, 'hidden disguise changes must not leak into oni memory');
+
+  oni.senseTarget({ mimicTarget: shelf, visible: true });
+  oni.senseTarget({ mimicTarget: sofa, visible: true });
+  assert.ok(oni.eventDetectScale > 1);
+  assert.ok(oni.inspectChance > oni.baseInspectChance);
 });
