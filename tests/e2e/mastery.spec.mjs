@@ -32,6 +32,28 @@ test.describe('やりこみ MASTER CLEAR', () => {
     await expect(page.locator('#masteryCompact')).toContainText('0/26');
   });
 
+  test('高さが低い横長画面でも情報カードが画面外へ逃げずスクロールできる', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 420 });
+    await waitForApp(page);
+
+    const geometry = await page.locator('#cardInfo').evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        innerHeight: window.innerHeight,
+        clientHeight: el.clientHeight,
+        scrollHeight: el.scrollHeight,
+        overflowY: getComputedStyle(el).overflowY,
+      };
+    });
+
+    expect(geometry.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.bottom).toBeLessThanOrEqual(geometry.innerHeight + 1);
+    expect(geometry.overflowY).toBe('auto');
+    expect(geometry.scrollHeight).toBeGreaterThanOrEqual(geometry.clientHeight);
+  });
+
   test('全S・全MISSION・全鬼攻略・ALL CLEARでMASTER CLEARになる', async ({ page }) => {
     await page.addInitScript(({ stages, onis }) => {
       localStorage.setItem('ningenkagu.completed', '1');
