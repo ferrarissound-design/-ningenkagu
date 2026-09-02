@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import '../../js/stages/scienceroom.js';
 import { STAGE_EVENTS } from '../../js/stageEvents.js';
 
 test('理科室には蒸気イベントが登録される', () => {
