@@ -1,29 +1,21 @@
 // 家具ごとの「擬態のクセ」。
 //
-// 鬼側だけでなくプレイヤー側にも攻略の選択肢を作るため、
-// 家具の種類ごとに小さな得意・不得意を与える。
-// 元の Game ロジックはそのまま使い、固有特性だけを上乗せする。
-import { Game } from './game.js';
+// Game.prototype を後から書き換えず、Game 本体から明示的に呼べる補正関数だけを提供する。
+// これで読み込み順によってゲームルールが変わる暗黙依存をなくす。
 import { clamp, rectDistance } from './utils.js';
 import { FURNITURE_TRAITS, POSE_FOR_KIND } from './furnitureKinds.js';
 
 export { FURNITURE_TRAITS };
 
-/**
- * 既存の「色・静止・ポーズ・距離」計算を先に呼び、家具固有の補正だけを加える。
- * これなら game.js 側の基礎バランスを今後変えても、特性側へ自動で反映される。
- * 上限94%は維持するので、固有能力だけで絶対安全にはならない。
- */
-const baseComputeMimicry = Game.prototype.computeMimicry;
-Game.prototype.computeMimicry = function computeMimicryWithFurnitureTraits() {
-  const base = baseComputeMimicry.call(this);
-  const t = this.player.mimicTarget;
-  if (!t) return base;
+/** 家具固有の擬態補正を既存の擬態成功度へ加える。 */
+export function applyFurnitureTraitBonus(game, base) {
+  const t = game.player.mimicTarget;
+  if (!t) return clamp(base, 0, 0.94);
 
-  const matched = POSE_FOR_KIND[t.kind] === this.player.pose;
-  const still = this.player.stillness;
-  const speed = this.player.speed;
-  const distance = rectDistance(t.rect, this.player.position.x, this.player.position.z);
+  const matched = POSE_FOR_KIND[t.kind] === game.player.pose;
+  const still = game.player.stillness;
+  const speed = game.player.speed;
+  const distance = rectDistance(t.rect, game.player.position.x, game.player.position.z);
   let bonus = 0;
 
   switch (t.kind) {
@@ -57,8 +49,8 @@ Game.prototype.computeMimicry = function computeMimicryWithFurnitureTraits() {
       break;
 
     case 'bin': {
-      const dx = this.oni.position.x - this.player.position.x;
-      const dz = this.oni.position.z - this.player.position.z;
+      const dx = game.oni.position.x - game.player.position.x;
+      const dz = game.oni.position.z - game.player.position.z;
       const oniDist = Math.hypot(dx, dz);
       if (matched && oniDist > 5.0) bonus += 0.075;
       if (oniDist < 2.7) bonus -= 0.085;
@@ -79,17 +71,13 @@ Game.prototype.computeMimicry = function computeMimicryWithFurnitureTraits() {
   }
 
   return clamp(base + bonus, 0, 0.94);
-};
+}
 
-// 擬態した瞬間だけ特性を知らせる。常設UIを増やさず、覚えれば見なくて済む情報にする。
-const baseTryMimic = Game.prototype.tryMimic;
-Game.prototype.tryMimic = function tryMimicWithTraitNotice() {
-  const target = this.nearTarget;
-  baseTryMimic.call(this);
-  if (!target || this.player.mimicTarget !== target) return;
-  const trait = FURNITURE_TRAITS[target.kind];
-  if (trait) this.hud.toast(`${trait.icon} ${trait.name}：${trait.desc}`);
-};
+/** 擬態成功時に一度だけ出す家具特性の説明文。 */
+export function furnitureTraitMessage(kind) {
+  const trait = FURNITURE_TRAITS[kind];
+  return trait ? `${trait.icon} ${trait.name}：${trait.desc}` : '';
+}
 
-// コンソールから一覧を確認できるようにしておく。通常UIには出さない。
+// 開発コンソール向けの互換表示。ゲームルール自体には影響しない。
 globalThis.__ningenFurnitureTraits = FURNITURE_TRAITS;
