@@ -106,6 +106,40 @@ function ensureCompact() {
   return compact;
 }
 
+// 最後の1冠を取った瞬間をタイトルへ戻るまで隠さない。
+// 既存リザルトの stats に1枠だけ追加し、現在の総進行を見せる。
+function ensureResultMastery() {
+  let wrap = document.getElementById('resultMasteryStat');
+  if (wrap) return wrap;
+  const stats = document.querySelector('#result .stats');
+  if (!stats) return null;
+
+  wrap = document.createElement('div');
+  wrap.id = 'resultMasteryStat';
+  const label = document.createElement('span');
+  label.textContent = 'やりこみ';
+  const value = document.createElement('b');
+  value.id = 'resultMastery';
+  value.textContent = '—';
+  wrap.append(label, value);
+  stats.appendChild(wrap);
+  return wrap;
+}
+
+function syncResultMastery(data = snapshot()) {
+  const wrap = ensureResultMastery();
+  if (!wrap || !data) return data;
+  const value = wrap.querySelector('#resultMastery');
+  if (value) {
+    value.textContent = data.complete
+      ? `👑 MASTER CLEAR ${data.earned}/${data.total}`
+      : `🏅 ${data.earned}/${data.total}`;
+  }
+  wrap.classList.toggle('best', data.complete);
+  wrap.title = data.complete ? '全冠達成' : 'Sランク・MISSION・鬼攻略・ALL CLEARの合計';
+  return data;
+}
+
 let lastSignature = '';
 let latestSnapshot = null;
 
@@ -164,6 +198,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   window.__ningenkaguMastery = {
     snapshot: () => latestSnapshot || syncMasteryUi(),
     sync: syncMasteryUi,
+    syncResult: () => syncResultMastery(latestSnapshot || snapshot()),
   };
 
   // 同一タブの localStorage 更新では storage イベントが発火しないため、
@@ -176,8 +211,14 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   window.addEventListener('storage', syncMasteryUi);
   onGameState((state) => {
     if (state === 'title') window.setTimeout(syncMasteryUi, 0);
-    // win直後は missionUi が次フレームで保存するため、少し後にも拾う。
-    if (state === 'win') window.setTimeout(syncMasteryUi, 120);
+    if (state === 'win' || state === 'lose') {
+      // rank / mission / oniClear / completed は他モジュールがリザルト遷移直後に保存する。
+      // それらが揃った後に再集計して、今回獲得した冠までリザルトへ反映する。
+      window.setTimeout(() => {
+        const data = syncMasteryUi() || snapshot();
+        syncResultMastery(data);
+      }, 160);
+    }
   });
 
   if (document.readyState === 'loading') {
