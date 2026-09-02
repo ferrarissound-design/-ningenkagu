@@ -63,7 +63,7 @@ export const STAGE_DEFINITIONS = Object.freeze([
     id: 'scienceroom',
     name: '理科室',
     label: 'STAGE 5　理科室',
-    clearNote: '',
+    clearNote: '全5ステージ制覇！ カグミンはすべての部屋で鬼を出し抜いた。次はSランク、ミッション、全鬼タイプ攻略を狙おう。',
     build: buildScienceRoom,
     startView: {
       position: [-5.0, 0, 4.0],
