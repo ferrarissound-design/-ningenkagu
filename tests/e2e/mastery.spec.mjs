@@ -15,10 +15,21 @@ test.describe('やりこみ MASTER CLEAR', () => {
     await expect(page.locator('#masteryPanel')).toBeVisible();
     await expect(page.locator('#masteryTitle')).toContainText('0/26');
     await expect(page.locator('#masteryNext')).toContainText('全5ステージ制覇');
+    await expect(page.locator('#masteryCompact')).toContainText('0/26');
 
     const bar = page.locator('#masteryBar');
     await expect(bar).toHaveAttribute('max', '26');
     await expect(bar).toHaveAttribute('value', '0');
+  });
+
+  test('スマホ幅でもタイトル下部にやりこみ進行が見える', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await waitForApp(page);
+
+    // 右の情報カードは860px以下で畳まれるため、短縮表示がスマホでの主表示になる。
+    await expect(page.locator('#masteryPanel')).toBeHidden();
+    await expect(page.locator('#masteryCompact')).toBeVisible();
+    await expect(page.locator('#masteryCompact')).toContainText('0/26');
   });
 
   test('全S・全MISSION・全鬼攻略・ALL CLEARでMASTER CLEARになる', async ({ page }) => {
@@ -42,6 +53,8 @@ test.describe('やりこみ MASTER CLEAR', () => {
     await expect(page.locator('#masteryDetail')).toContainText('鬼攻略 15/15');
     await expect(page.locator('#masteryNext')).toContainText('完全制覇');
     await expect(page.locator('#masteryPanel')).toHaveAttribute('data-complete', 'true');
+    await expect(page.locator('#masteryCompact')).toContainText('26/26');
+    await expect(page.locator('#masteryCompact')).toHaveAttribute('data-complete', 'true');
   });
 
   test('ALL CLEAR後は最初の未達成Sランクを次の冠として示す', async ({ page }) => {
@@ -53,5 +66,6 @@ test.describe('やりこみ MASTER CLEAR', () => {
     await waitForApp(page);
     await expect(page.locator('#masteryTitle')).toContainText('2/26');
     await expect(page.locator('#masteryNext')).toContainText('教室でSランク');
+    await expect(page.locator('#masteryCompact')).toHaveAttribute('title', /教室でSランク/);
   });
 });
