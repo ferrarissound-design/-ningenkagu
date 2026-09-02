@@ -13,6 +13,7 @@ class MemoryStorage {
 
 test('progress key classifier covers every saved progression family', () => {
   assert.equal(isProgressKey('ningenkagu.stageIndex'), true);
+  assert.equal(isProgressKey('ningenkagu.completed'), true);
   assert.equal(isProgressKey('ningenkagu.best.living'), true);
   assert.equal(isProgressKey('ningenkagu.rank.library'), true);
   assert.equal(isProgressKey('ningenkagu.mission.artroom'), true);
@@ -24,6 +25,7 @@ test('progress key classifier covers every saved progression family', () => {
 test('clearProgressData removes progression but preserves player settings', () => {
   const storage = new MemoryStorage({
     'ningenkagu.stageIndex': '4',
+    'ningenkagu.completed': '1',
     'ningenkagu.best.living': '1234',
     'ningenkagu.rank.living': 'S',
     'ningenkagu.mission.living': '1',
@@ -36,8 +38,9 @@ test('clearProgressData removes progression but preserves player settings', () =
   });
 
   const removed = clearProgressData(storage);
-  assert.equal(removed.length, 5);
+  assert.equal(removed.length, 6);
   assert.equal(storage.getItem('ningenkagu.stageIndex'), null);
+  assert.equal(storage.getItem('ningenkagu.completed'), null);
   assert.equal(storage.getItem('ningenkagu.best.living'), null);
   assert.equal(storage.getItem('ningenkagu.rank.living'), null);
   assert.equal(storage.getItem('ningenkagu.mission.living'), null);

@@ -85,6 +85,22 @@ test.describe('STAGE 5 理科室', () => {
     await expect(page.locator('#resultMission')).toHaveText('✓ 白煙突破');
   });
 
+  test('理科室クリアでALL CLEARになり、制覇記録がタイトルにも残る', async ({ page }) => {
+    await unlockScience(page);
+    await page.click('#btnStart');
+    await page.waitForFunction(() => window.__ningenkagu.game.state === 'playing');
+
+    await page.evaluate(() => window.__ningenkagu.game.win());
+
+    await expect(page.locator('#resultTitle')).toHaveText('ALL CLEAR!');
+    await expect(page.locator('#resultNote')).toContainText('全5ステージ制覇');
+    await expect(page.locator('#btnRetry')).toHaveText('理科室をもう一度');
+    expect(await page.evaluate(() => localStorage.getItem('ningenkagu.completed'))).toBe('1');
+
+    await page.click('#btnResultTitle');
+    await expect(page.locator('#allClearBadge')).toContainText('全5ステージ制覇済み');
+  });
+
   test('図書室クリア後の「次のステージへ」で理科室へ進む', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('ningenkagu.stageIndex', '3'));
     await page.goto('/index.html');
