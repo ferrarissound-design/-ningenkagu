@@ -3,6 +3,7 @@ import { rectDistance, disposeObject3D } from './utils.js';
 import { ROOM } from './stageBuilder.js';
 import { getStageDefinition } from './stageRegistry.js';
 import { POSE_FOR_KIND } from './furnitureKinds.js';
+import './stageEventExtensions.js';
 
 export { ROOM, POSE_FOR_KIND };
 
