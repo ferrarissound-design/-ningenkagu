@@ -1,6 +1,7 @@
 // ゲーム本体とは独立した「ページの器」側の仕上げ。
 // 保存データ初期化、ダイアログのフォーカス管理、Service Worker 登録をまとめる。
 import { clearProgressData } from './saveData.js';
+import { buildSaveFile, parseSaveFile, applySaveEntries } from './saveTransfer.js';
 
 function installProgressReset() {
   const card = document.getElementById('cardConfig');
@@ -36,6 +37,103 @@ function installProgressReset() {
     button.textContent = '初期化済み';
     // 各モジュールが持つ表示キャッシュも確実に初期化するため、ページを作り直す。
     window.setTimeout(() => window.location.reload(), 120);
+  });
+}
+
+function downloadFileName() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `ningenkagu-save-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`;
+}
+
+/**
+ * localStorage はブラウザ・端末ごとに独立しているため、機種変更や
+ * ブラウザの初期化で進行データがすべて消える。ファイル1つに書き出し／
+ * 読み込みできるようにして、バックアップや別端末への移行に使えるようにする。
+ */
+function installSaveTransfer() {
+  const card = document.getElementById('cardConfig');
+  if (!card || document.getElementById('btnExportSave')) return;
+
+  const row = document.createElement('div');
+  row.className = 'trow';
+
+  const label = document.createElement('span');
+  label.textContent = 'セーブデータ';
+
+  const buttons = document.createElement('span');
+  buttons.style.display = 'flex';
+  buttons.style.gap = '6px';
+
+  const exportBtn = document.createElement('button');
+  exportBtn.id = 'btnExportSave';
+  exportBtn.className = 'chipbtn';
+  exportBtn.type = 'button';
+  exportBtn.textContent = '書き出す';
+  exportBtn.setAttribute('aria-label', '進行データと設定をファイルへ書き出す');
+
+  const importBtn = document.createElement('button');
+  importBtn.id = 'btnImportSave';
+  importBtn.className = 'chipbtn';
+  importBtn.type = 'button';
+  importBtn.textContent = '読み込む';
+  importBtn.setAttribute('aria-label', 'ファイルから進行データと設定を読み込む');
+
+  const fileInput = document.createElement('input');
+  fileInput.id = 'inputImportSave';
+  fileInput.type = 'file';
+  fileInput.accept = 'application/json,.json';
+  fileInput.hidden = true;
+
+  buttons.append(exportBtn, importBtn);
+  row.append(label, buttons);
+
+  const note = document.createElement('p');
+  note.className = 'tcard-p';
+  note.textContent = 'ベストスコア・ランク・ミッション・鬼攻略・音量などの設定を1つのファイルにまとめて書き出せます。別のブラウザや端末へ移すときや、初期化前のバックアップに使えます。';
+
+  card.append(row, fileInput, note);
+
+  exportBtn.addEventListener('click', () => {
+    const file = buildSaveFile();
+    const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = downloadFileName();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  importBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (!file) return;
+
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      window.alert('ファイルを読み込めませんでした。');
+      return;
+    }
+
+    const result = parseSaveFile(text);
+    if (!result.ok) {
+      window.alert('このファイルは読み込めませんでした。ニンゲン家具のセーブデータファイルを選んでください。');
+      return;
+    }
+
+    const ok = window.confirm(`${result.entries.length}件のデータを読み込みます。現在のベストスコア・ランク・進行状況・設定は上書きされます。よろしいですか？`);
+    if (!ok) return;
+
+    applySaveEntries(result.entries);
+    window.alert('読み込みました。');
+    window.location.reload();
   });
 }
 
@@ -123,6 +221,7 @@ function registerServiceWorker() {
 }
 
 installProgressReset();
+installSaveTransfer();
 installFatalReload();
 installDialogA11y('pause', 'btnResume');
 installDialogA11y('result', 'btnRetry');
