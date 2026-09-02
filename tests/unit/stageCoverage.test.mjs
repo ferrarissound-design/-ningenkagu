@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import '../../js/stage.js';
 import { STAGE_DEFINITIONS } from '../../js/stageRegistry.js';
 import { START_VIEWS } from '../../js/startViews.js';
 import { MISSIONS } from '../../js/mission.js';
