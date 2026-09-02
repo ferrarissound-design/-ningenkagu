@@ -82,18 +82,50 @@ function ensurePanel() {
   return panel;
 }
 
+// 右カードはスマホ幅で畳まれるため、タイトル下部にも常時見える短縮表示を置く。
+function ensureCompact() {
+  let compact = document.getElementById('masteryCompact');
+  if (compact) return compact;
+
+  const bottom = document.querySelector('#title .tl-bottom');
+  if (!bottom) return null;
+
+  compact = document.createElement('span');
+  compact.id = 'masteryCompact';
+  compact.className = 'blab';
+  compact.style.whiteSpace = 'nowrap';
+  compact.setAttribute('aria-live', 'polite');
+  bottom.appendChild(compact);
+  return compact;
+}
+
 let lastSignature = '';
 let latestSnapshot = null;
 
 export function syncMasteryUi() {
   const panel = ensurePanel();
-  if (!panel) return null;
+  const compact = ensureCompact();
+  if (!panel && !compact) return null;
 
   const data = snapshot();
+  latestSnapshot = data;
   const signature = JSON.stringify(data);
   if (signature === lastSignature) return data;
   lastSignature = signature;
-  latestSnapshot = data;
+
+  const target = nextMasteryTarget(data);
+  const targetText = targetLabel(target);
+
+  if (compact) {
+    compact.textContent = data.complete ? `👑 ${data.earned}/${data.total}` : `🏅 ${data.earned}/${data.total}`;
+    compact.title = data.complete ? 'MASTER CLEAR' : (targetText ? `次の冠：${targetText}` : 'やりこみ進行');
+    compact.setAttribute('aria-label', data.complete
+      ? `MASTER CLEAR ${data.earned}/${data.total}`
+      : `やりこみ ${data.earned}/${data.total}。${targetText ? `次の冠 ${targetText}` : ''}`);
+    compact.dataset.complete = data.complete ? 'true' : 'false';
+  }
+
+  if (!panel) return data;
 
   const title = panel.querySelector('#masteryTitle');
   const bar = panel.querySelector('#masteryBar');
@@ -114,8 +146,7 @@ export function syncMasteryUi() {
   } else {
     if (title) title.textContent = `🏅 やりこみ　${data.earned}/${data.total}`;
     if (detail) detail.textContent = `S ${data.groups.sRank.earned}/${data.groups.sRank.total}　MISSION ${data.groups.mission.earned}/${data.groups.mission.total}　鬼攻略 ${data.groups.oni.earned}/${data.groups.oni.total}`;
-    const target = nextMasteryTarget(data);
-    if (next) next.textContent = target ? `次の冠：${targetLabel(target)}` : '';
+    if (next) next.textContent = target ? `次の冠：${targetText}` : '';
     panel.dataset.complete = 'false';
   }
 
