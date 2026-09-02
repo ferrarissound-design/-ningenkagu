@@ -10,6 +10,11 @@ test('stage registry has unique ids and complete definitions', () => {
 
   for (const stage of STAGE_DEFINITIONS) {
     assert.equal(typeof stage.id, 'string');
+    assert.equal(typeof stage.name, 'string');
+    assert.ok(stage.name.length > 0);
+    assert.equal(typeof stage.label, 'string');
+    assert.ok(stage.label.startsWith('STAGE '));
+    assert.equal(typeof stage.clearNote, 'string');
     assert.equal(typeof stage.build, 'function');
     assert.ok(Array.isArray(stage.startView?.position));
     assert.equal(stage.startView.position.length, 3);
