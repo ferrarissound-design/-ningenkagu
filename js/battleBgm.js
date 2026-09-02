@@ -10,6 +10,7 @@ import { isMuted, onMuteChange, getBgmVolume, onBgmVolumeChange } from './audio.
 import { getGameState, onGameState } from './gameState.js';
 import './titleMenu.js';
 import './missionUi.js';
+import './appShell.js';
 
 const TITLE_BGM_URL = new URL('../assets/audio/behind_the_potted_plant.mp3', import.meta.url).href;
 const BATTLE_BGM_URL = new URL('../assets/audio/gold_medal_morning.mp3', import.meta.url).href;
