@@ -54,7 +54,7 @@ test.describe('やりこみ MASTER CLEAR', () => {
     expect(geometry.scrollHeight).toBeGreaterThanOrEqual(geometry.clientHeight);
   });
 
-  test('全S・全MISSION・全鬼攻略・ALL CLEARでMASTER CLEARになる', async ({ page }) => {
+  test('全S・全MISSION・全鬼攻略・ALL CLEARでMASTER CLEARになり、リザルトでも表示される', async ({ page }) => {
     await page.addInitScript(({ stages, onis }) => {
       localStorage.setItem('ningenkagu.completed', '1');
       for (const stageId of stages) {
@@ -77,6 +77,12 @@ test.describe('やりこみ MASTER CLEAR', () => {
     await expect(page.locator('#masteryPanel')).toHaveAttribute('data-complete', 'true');
     await expect(page.locator('#masteryCompact')).toContainText('26/26');
     await expect(page.locator('#masteryCompact')).toHaveAttribute('data-complete', 'true');
+
+    await page.click('#btnStart');
+    await page.waitForFunction(() => window.__ningenkagu.game.state === 'playing');
+    await page.evaluate(() => window.__ningenkagu.game.win());
+    await expect(page.locator('#resultMastery')).toContainText('MASTER CLEAR 26/26');
+    await expect(page.locator('#resultMasteryStat')).toHaveClass(/best/);
   });
 
   test('ALL CLEAR後は最初の未達成Sランクを次の冠として示す', async ({ page }) => {
