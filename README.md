@@ -1,7 +1,7 @@
 # ニンゲン家具 (Ningen Kagu)
 
 家具に変身できる丸い生き物 **「カグミン」** を操作して、一つ目の見回りモンスターから **60秒間** 見つからずに生き残る、ブラウザだけで動く3Dステルスゲームです。
-**リビング → 教室 → 美術室 → 図書室 → 理科室** の5面構成で、前のステージをクリアすると次へ進みます。
+**リビング → 教室 → 美術室 → 図書室 → 理科室** の5面構成で、前のステージをクリアすると次へ進みます。理科室を突破すると **ALL CLEAR!** になり、全5ステージ制覇が保存されます。
 
 外部モデル・外部APIを使わず、Three.js のプリミティブ形状だけで作られています。
 ビルド不要で、静的HTTPサーバーや GitHub Pages からそのまま公開できます。
@@ -41,6 +41,7 @@
 | BGM音量 / 効果音音量 | それぞれ 0〜100% で個別に調整 |
 | 視点感度 | ドラッグ・ゲームパッド右スティックの視点操作の速さを 50〜200% で調整 |
 | Y軸反転 | 視点の上下方向を反転 |
+| 進行データ | ベスト・ランク・ミッション・鬼攻略・到達ステージ・全ステージ制覇を初期化。音量や操作設定は残る |
 
 ## ステージ
 
@@ -59,6 +60,7 @@ STAGE 4 の図書室は「静かな部屋」で、同じ足音でも他ステー
 - 前のステージをクリアすると次のステージへ進みます。負けた場合は同じステージをリトライします。
 - 到達したステージはブラウザに保存され、次に開いたときもその面から再開します。タイトル下部のチップで解放済みの面へ戻れます。
 - ベストスコアとベストランクはステージごとに別で記録されます。
+- STAGE 5 をクリアすると **ALL CLEAR!**。タイトルの情報カードにも `🏆 全5ステージ制覇済み` が残ります。
 
 ## ステージイベント（プレイ中に部屋が変わる）
 
@@ -86,11 +88,9 @@ STAGE 4 の図書室は「静かな部屋」で、同じ足音でも他ステー
 **新しいステージへイベントを足すとき**は次の2か所を触ります。
 
 1. `js/stages/<ステージ>.js` … そのステージの `eventRig`（鬼が見る位置・立ち位置候補・使う3Dオブジェクト）
-2. `js/stageEvents.js` … `STAGE_EVENTS` にステージIDのキーを1つ追加
+2. `js/stageEvents.js` … `STAGE_EVENTS` にステージIDのイベント定義を1つ追加
 
-理科室のように演出用の3Dオブジェクトとイベント定義が密に絡む面は、
-ステージ側のファイルから `STAGE_EVENTS.<ステージID>` へ直接登録しても構いません
-（`js/stages/scienceroom.js` がその例）。
+イベント定義は `stageEvents.js` に集約します。ステージビルダーは読み込み時に `STAGE_EVENTS` を書き換えないため、読み込み順による副作用はありません。
 
 開発用に、現在のイベント状態は `window.__ningenkagu.game.stageEvent`（要約は `__ningenkagu.stageEventInfo()`）で確認でき、
 `window.__ningenkagu.triggerStageEvent()` で現在ステージのイベントを強制発生できます（通常UIには出ません）。
@@ -212,38 +212,45 @@ HUD の「擬態 ○○%」は次の4つで決まります。
 ## 構成
 
 ```
-index.html            エントリポイント
-css/style.css         UI / HUD / スマホ操作
-js/main.js            レンダラ・ライト・ゲームループ・UI配線
-js/startViews.js      各ステージの開始位置とカメラ向き
-js/game.js            ゲーム進行、擬態成功度、発見判定、スコア
-js/stage.js           ステージ登録と、全ステージ共通の判定（擬態対象の検索・当たり判定）
-js/stageBuilder.js    部屋の寸法と、家具を組み立てる共通ビルダー
-js/stages/*.js        各ステージのレイアウト（リビング / 教室 / 美術室 / 図書室 / 理科室）
-js/furnitureTraits.js 家具の種類ごとの擬態のクセ（擬態成功度への上乗せ）
-js/player.js          カグミンの見た目・表情・ポーズ
-js/oni.js             一つ目の見回りモンスター（巡回・視界・遮蔽判定・状態遷移）
-js/oniConstants.js    鬼の状態と家具検査モードの調整値
+index.html             エントリポイント
+css/style.css          UI / HUD / スマホ操作
+js/main.js             レンダラ・ライト・ゲームループ・UI配線
+js/game.js             ゲーム進行、擬態成功度、発見判定、スコア
+js/gameState.js        ゲーム状態（title / playing / paused / win / lose）の通知口
+js/stageRegistry.js    ステージID・表示・ビルダー・開始構図の一元定義
+js/startViews.js       stageRegistry 由来の開始構図互換レイヤ
+js/stage.js            ステージ生成と全ステージ共通判定
+js/stageBuilder.js     部屋の寸法と家具を組み立てる共通ビルダー
+js/stages/*.js         各ステージのレイアウトと eventRig
+js/stageEvents.js      全ステージのランダムイベント定義
+js/furnitureKinds.js   家具種類・正解ポーズ・表示情報の一元定義
+js/furnitureTraits.js  家具の種類ごとの擬態成功度補正
+js/player.js           カグミンの見た目・表情・ポーズ
+js/oni.js              一つ目の見回りモンスター（巡回・視界・遮蔽判定・状態遷移）
+js/oniConstants.js     鬼の状態と家具検査モードの調整値
 js/oniPersonalities.js 鬼の性格タイプ（視界・速度・検査傾向の倍率）
-js/oniInspect.js      家具検査モードの動作（接近 / 横回り / フェイント / 振り返り）
-js/oniVisuals.js      鬼の見た目・視界コーンの組み立て
-js/stageEvents.js     ステージ固有のランダムイベント（テレビ / チャイム / 消灯 / 落本 / 蒸気）
-js/mission.js         ステージ別ミッションの定義と判定（純粋ロジック）
-js/missionUi.js       ミッションと鬼攻略記録の進行・保存・表示
-js/oniProgress.js     鬼タイプ別クリア記録の集計（純粋ロジック）
-js/rank.js            クリア評価ランク S/A/B/C の判定
-js/gameState.js       ゲーム状態（title / playing / paused / win / lose）の通知口
-js/input.js           キーボード / マウス / タッチ / ゲームパッド入力
-js/hud.js             画面表示、ベストスコア・ベストランクの保存
-js/effects.js         擬態エフェクト、対象マーカー
-js/audio.js           WebAudio で合成する効果音（音素材ファイル不要）
-js/battleBgm.js       タイトル / プレイ中のBGM切替（gameState を購読して追従）
-js/titleMenu.js       スマホでのタイトルカード操作
-assets/audio/         BGM（タイトル曲・戦闘曲。効果音は audio.js が合成するので別途無し）
-assets/ogp.jpg        SNS共有カード用の画像（実際のタイトル画面から生成）
-assets/icon-*.png     ホーム画面に追加したときのアプリアイコン
-manifest.json         PWA としてインストールするための情報
-vendor/three/         Three.js r180 (MIT)
+js/oniInspect.js       家具検査モードの動作（接近 / 横回り / フェイント / 振り返り）
+js/oniMemory.js        鬼が見た擬態家具を覚える短期記憶
+js/oniVisuals.js       鬼の見た目・視界コーンの組み立て
+js/mission.js          ステージ別ミッションの定義と判定（純粋ロジック）
+js/missionUi.js        ミッションと鬼攻略記録の進行・保存・表示
+js/oniProgress.js      鬼タイプ別クリア記録の集計（純粋ロジック）
+js/rank.js             クリア評価ランク S/A/B/C の判定
+js/saveData.js         進行データだけを安全に初期化する保存ユーティリティ
+js/appShell.js         進行リセット、モーダル操作、Service Worker 登録
+js/completionUi.js     STAGE 5 の ALL CLEAR と制覇済み表示
+js/input.js            キーボード / マウス / タッチ / ゲームパッド入力
+js/hud.js              画面表示、ベストスコア・ベストランクの保存
+js/effects.js          擬態エフェクト、対象マーカー
+js/audio.js            WebAudio で合成する効果音（音素材ファイル不要）
+js/battleBgm.js        タイトル / プレイ中のBGM切替とUI補助モジュールの起動
+js/titleMenu.js        スマホでのタイトルカード操作
+sw.js                  初回オンライン訪問後のオフライン起動用 Service Worker
+assets/audio/          BGM（タイトル曲・戦闘曲。効果音は audio.js が合成するので別途無し）
+assets/ogp.jpg         SNS共有カード用の画像（実際のタイトル画面から生成）
+assets/icon-*.png      ホーム画面に追加したときのアプリアイコン
+manifest.json          PWA としてインストールするための情報
+vendor/three/          Three.js r180 (MIT)
 ```
 
 ## 動かす
@@ -261,6 +268,7 @@ npm run serve
 （Jekyll の処理を避けるため `.nojekyll` を置いてあります）
 
 スマホでは「ホーム画面に追加」でフルスクリーンのアプリとして起動できます（`manifest.json`）。
+対応ブラウザでは Service Worker がゲーム本体を保存するため、**一度オンラインで正常に起動した後はオフラインでも再起動できます**。オフライン機能が使えない環境でも通常のオンラインプレイには影響しません。
 
 **別の場所へ公開する場合**は、`index.html` の次の3か所を新しいURLへ差し替えてください。
 OGP の仕様上、`og:image` と `og:url` は絶対URLである必要があり、相対パスにすると
@@ -287,8 +295,8 @@ npm test            # 両方まとめて実行
 
 | | 内容 | 場所 |
 |---|---|---|
-| ユニットテスト | `utils.js` の各関数、`alertLevel`、`resolveCollisions`、`gameState.js` の状態通知、`audio.js` のミュート通知、`disposeObject3D` の解放範囲、ミッション / ランク / 鬼攻略の判定、各ステージのレイアウト（スポーンや巡回点が家具に埋まらないこと）、開始構図（`startViews.js`）、理科室の蒸気演出 | `tests/unit/` |
-| E2Eスモークテスト | 起動確認、ステージ切替・タイトル復帰を繰り返してもGPUリソース（ジオメトリ・テクスチャ）が増え続けないこと、BGMがゲーム状態に正しく追従すること、画面上の操作ボタン（擬態 / ポーズ / おとり）が効くこと、ミッションとランクの保存 | `tests/e2e/` |
+| ユニットテスト | `utils.js` の各関数、`alertLevel`、`resolveCollisions`、`gameState.js` の状態通知、`audio.js` のミュート通知、`disposeObject3D` の解放範囲、ミッション / ランク / 鬼攻略 / 全ステージ制覇 / 進行リセットの判定、各ステージのレイアウト、開始構図、理科室の蒸気演出 | `tests/unit/` |
+| E2Eスモークテスト | 起動確認、ステージ切替・タイトル復帰を繰り返してもGPUリソースが増え続けないこと、BGM追従、画面上の操作、ミッションとランクの保存、STAGE 5 の ALL CLEAR と制覇記録 | `tests/e2e/` |
 
 `npm run test:e2e` は初回のみブラウザのダウンロードが必要な場合があります（`npx playwright install chromium`）。GitHub Actions では `.github/workflows/ci.yml` が push・PRごとに両方を自動実行します。
 
