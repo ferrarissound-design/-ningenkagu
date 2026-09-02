@@ -1,50 +1,20 @@
 // ステージ登録と、全ステージ共通の判定ロジック
 import { rectDistance, disposeObject3D } from './utils.js';
 import { ROOM } from './stageBuilder.js';
-import { buildLivingRoom } from './stages/living.js';
-import { buildClassroom } from './stages/classroom.js';
-import { buildArtRoom } from './stages/artroom.js';
-import { buildLibrary } from './stages/library.js';
-import { buildScienceRoom } from './stages/scienceroom.js';
+import { getStageDefinition } from './stageRegistry.js';
+import { POSE_FOR_KIND } from './furnitureKinds.js';
 
-export { ROOM };
-
-/**
- * 擬態対象の種類ごとの「似合うポーズ」。
- * プレイヤーがこのポーズに合わせると擬態成功度が大きく上がる。
- */
-export const POSE_FOR_KIND = {
-  wall: 'stand',
-  shelf: 'tpose',
-  table: 'tpose',
-  plant: 'ypose',
-  sofa: 'crouch',
-  chair: 'crouch',
-  box: 'crouch',
-  bin: 'crouch',
-  statue: 'ypose',
-  easel: 'tpose',
-};
+export { ROOM, POSE_FOR_KIND };
 
 /**
  * main.js が globalThis.__ningenkaguStage に指定したステージを生成する。
- * 未指定時はリビングを使う。
+ * 未指定・不正なIDは stageRegistry.js 側でリビングへフォールバックする。
  *
  * 新しいステージを足すときは js/stages/ に buildXxx(scene) を追加し、
- * ここへ登録する。家具生成の共通処理は stageBuilder.js が担当する。
+ * stageRegistry.js へ登録する。家具生成の共通処理は stageBuilder.js が担当する。
  */
-const STAGE_BUILDERS = {
-  living: buildLivingRoom,
-  classroom: buildClassroom,
-  artroom: buildArtRoom,
-  library: buildLibrary,
-  scienceroom: buildScienceRoom,
-};
-
 export function buildStage(scene) {
-  const stageId = globalThis.__ningenkaguStage;
-  const build = STAGE_BUILDERS[stageId] ?? buildLivingRoom;
-  return build(scene);
+  return getStageDefinition(globalThis.__ningenkaguStage).build(scene);
 }
 
 /** ステージが確保した GPU リソースを解放する。作り直す前に必ず呼ぶ。 */

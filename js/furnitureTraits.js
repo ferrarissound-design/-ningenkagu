@@ -4,51 +4,10 @@
 // 家具の種類ごとに小さな得意・不得意を与える。
 // 元の Game ロジックはそのまま使い、固有特性だけを上乗せする。
 import { Game } from './game.js';
-import { POSE_FOR_KIND } from './stage.js';
 import { clamp, rectDistance } from './utils.js';
+import { FURNITURE_TRAITS, POSE_FOR_KIND } from './furnitureKinds.js';
 
-export const FURNITURE_TRAITS = {
-  wall: {
-    icon: '🧱', name: '壁同化',
-    desc: '直立して壁際に寄るほど輪郭が消える',
-  },
-  shelf: {
-    icon: '🗄️', name: '横一直線',
-    desc: 'Tポーズで静止すると棚の輪郭に溶け込む',
-  },
-  table: {
-    icon: '📐', name: '天板合わせ',
-    desc: 'Tポーズで止まると横長の家具として通りやすい',
-  },
-  plant: {
-    icon: '🌿', name: '葉っぱのゆらぎ',
-    desc: 'Yポーズなら、ゆっくりした移動は少しだけごまかせる',
-  },
-  sofa: {
-    icon: '🛋️', name: '低姿勢',
-    desc: 'しゃがんで静止すると大きな家具に紛れやすい',
-  },
-  chair: {
-    icon: '🪑', name: '低姿勢',
-    desc: 'しゃがんで静止すると脚と座面の輪郭に合わせやすい',
-  },
-  box: {
-    icon: '📦', name: '箱になりきる',
-    desc: 'しゃがんで止まるほど四角いシルエットが強くなる',
-  },
-  bin: {
-    icon: '🗑️', name: '遠目は完璧',
-    desc: '遠くからは強いが、近くで見られると形の違いがバレやすい',
-  },
-  statue: {
-    icon: '🗿', name: '完全静止',
-    desc: 'Yポーズでピタ止まりすると強い。動くと一気に不自然になる',
-  },
-  easel: {
-    icon: '🎨', name: '輪郭合わせ',
-    desc: 'Tポーズで静止するとキャンバスの形に紛れやすい',
-  },
-};
+export { FURNITURE_TRAITS };
 
 /**
  * 既存の「色・静止・ポーズ・距離」計算を先に呼び、家具固有の補正だけを加える。

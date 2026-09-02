@@ -2,7 +2,7 @@
 //
 // ステージID → そのステージ専用イベント、という対応だけをここに持たせる。
 // game.js には「毎フレーム update するマネージャ」しか置かないので、
-// ステージ4・5を足すときは STAGE_EVENTS に1項目書き足すだけでよい。
+// 新しいステージを足すときは STAGE_EVENTS に1項目書き足すだけでよい。
 import * as THREE from '../vendor/three/three.module.min.js';
 import { clamp, damp, randRange, prefersReducedMotion } from './utils.js';
 import { STATE } from './oniConstants.js';
@@ -36,7 +36,7 @@ const DARK_BG = new THREE.Color(0x080a11);
 
 /**
  * ステージごとの専用イベント。
- * 追加するときは stage.js の eventRig（目印）と対にして書く。
+ * 追加するときはステージ側の eventRig（目印）と対にして書く。
  */
 export const STAGE_EVENTS = {
   // ---------------- STAGE 1：リビング ----------------
@@ -130,6 +130,26 @@ export const STAGE_EVENTS = {
       m.hud.eventNotice('📚 本が崩れた！', '鬼が書架へ向かった');
       sfx.eventBookfall();
     },
+  },
+
+  // ---------------- STAGE 5：理科室 ----------------
+  scienceroom: {
+    id: 'steam',
+    name: '蒸気が噴き出した！',
+    durationMin: 6.5,
+    durationMax: 8.5,
+    // 蒸気は部屋側の現象なので、鬼が途中でプレイヤーを怪しんでも視界低下は残す。
+    liftVisionOnBreak: false,
+    onStart(m) {
+      const rig = m.stage.eventRig || {};
+      m.applyVision({ range: 0.48, angle: 0.62, peri: 0.72, detect: 0.38 });
+      m.focusOni({ look: rig.look, spots: rig.spots, stand: 0.45, glance: 0.65 });
+      m.setSteam(true);
+      m.hud.eventNotice('🧪 蒸気が噴き出した！', '白煙の間に移動しろ');
+      sfx.eventSteam();
+    },
+    onUpdate(m, dt) { m.animateSteam(dt); },
+    onEnd(m) { m.setSteam(false); },
   },
 };
 

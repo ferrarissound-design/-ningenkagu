@@ -5,11 +5,11 @@ import { Hud, loadBestRank } from './hud.js';
 import { Input } from './input.js';
 import {
   initAudio, setMuted, isMuted,
-  setBgmVolume, getBgmVolume, setSfxVolume, getSfxVolume,
+  setBgmVolume, setSfxVolume,
 } from './audio.js';
 import { ONI_PERSONALITIES, setForcedOniPersonality, getForcedOniPersonality } from './oniPersonalities.js';
 import { STAGE_EVENTS } from './stageEvents.js';
-import { START_VIEWS } from './startViews.js';
+import { STAGE_DEFINITIONS as STAGES } from './stageRegistry.js';
 
 const MUTE_KEY = 'ningenkagu.muted';
 const BGM_VOLUME_KEY = 'ningenkagu.bgmVolume';
@@ -17,13 +17,6 @@ const SFX_VOLUME_KEY = 'ningenkagu.sfxVolume';
 const SENSITIVITY_KEY = 'ningenkagu.lookSensitivity';
 const INVERT_Y_KEY = 'ningenkagu.invertY';
 const STAGE_KEY = 'ningenkagu.stageIndex';
-const STAGES = [
-  { id: 'living', label: 'STAGE 1　リビング', name: 'リビング', clearNote: 'リビング突破！ 次は机とロッカーだらけの教室。鬼の巡回路も変わる。' },
-  { id: 'classroom', label: 'STAGE 2　教室', name: '教室', clearNote: '教室突破！ 次は石膏像とイーゼルが並ぶ美術室。真っ白な像に紛れ込め。' },
-  { id: 'artroom', label: 'STAGE 3　美術室', name: '美術室', clearNote: '美術室突破！ 次は本棚が並ぶ図書室。書架の間を縫って逃げ切れ。' },
-  { id: 'library', label: 'STAGE 4　図書室', name: '図書室', clearNote: '図書室突破！ 次は実験台と標本棚が並ぶ理科室。蒸気で鬼の視界が揺らぐ。' },
-  { id: 'scienceroom', label: 'STAGE 5　理科室', name: '理科室', clearNote: '' },
-];
 
 /** 前回クリアまで進んだステージから再開できるようにする */
 function loadSavedStageIndex() {
@@ -306,7 +299,7 @@ function boot(renderer) {
    * キャラもカメラ前方へ向けておき、最初の一歩が自然に攻略エリアへ入るようにする。
    */
   function applyStageStartView() {
-    const cfg = START_VIEWS[STAGES[stageIndex].id];
+    const cfg = STAGES[stageIndex].startView;
     if (!cfg) return;
     game.player.reset(new THREE.Vector3(...cfg.position));
     game.camYaw = cfg.yaw;
