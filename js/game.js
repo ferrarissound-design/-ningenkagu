@@ -10,6 +10,7 @@ import { Effects } from './effects.js';
 import { StageEventManager, EVENT_PHASE } from './stageEvents.js';
 import { sfx } from './audio.js';
 import { setGameState } from './gameState.js';
+import { applyFurnitureTraitBonus, furnitureTraitMessage } from './furnitureTraits.js';
 
 export const CONFIG = {
   timeLimit: 60,
@@ -374,7 +375,7 @@ export class Game {
         this.noiseWarned = false;
       }
     } else {
-      // 家具検査・イベント中は足音を見ないので、聞こえ具合も下がらない。
+      // 家具検査・ステージイベント中は足音を見ないので、聞こえ具合も下がらない。
       // ここで戻しておかないと、通常の巡回に復帰したあと
       // 「足音が聞こえた…！」が二度と出なくなる。
       this.noiseWarned = false;
@@ -561,6 +562,8 @@ export class Game {
     this.hud.popup(t.label + 'に擬態！', 'good');
     sfx.mimic();
     this.twitch(0.08);
+    const traitMessage = furnitureTraitMessage(t.kind);
+    if (traitMessage) this.hud.toast(traitMessage);
   }
 
   /**
@@ -655,7 +658,7 @@ export class Game {
 
   /**
    * 擬態成功度 0..1。
-   * 色の一致・静止・ポーズ・その物の近くにいるか、の4要素。
+   * 色の一致・静止・ポーズ・その物の近くにいるか、の4要素＋家具固有特性。
    */
   computeMimicry() {
     const color = colorMatchScore(this.player.currentColor, this.backdropColor);
@@ -670,7 +673,7 @@ export class Game {
     }
     let v = 0.34 * color + 0.26 * still + 0.20 * pose + 0.20 * context;
     if (!t) v *= 0.6; // 擬態していない生身は目立つ
-    return clamp(v, 0, 0.94); // 100%にはしない＝絶対安全は無い
+    return applyFurnitureTraitBonus(this, v);
   }
 
   /** 指定のピッチでカメラ位置を求め、遮蔽があれば手前に寄せた距離を返す */
