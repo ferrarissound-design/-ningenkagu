@@ -53,9 +53,7 @@ function showFinalClear() {
   }
 
   const note = document.getElementById('resultNote');
-  if (note) {
-    note.textContent = `全${STAGE_DEFINITIONS.length}ステージ制覇！ カグミンはすべての部屋で鬼を出し抜いた。次はSランク、ミッション、全鬼タイプ攻略を狙おう。`;
-  }
+  if (note) note.textContent = FINAL_STAGE.clearNote;
 
   const retry = document.getElementById('btnRetry');
   if (retry) retry.textContent = `${FINAL_STAGE.name}をもう一度`;
