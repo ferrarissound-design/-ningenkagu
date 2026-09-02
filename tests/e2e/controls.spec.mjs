@@ -25,6 +25,27 @@ test.describe('画面上の操作ボタン', () => {
     await expect(page.locator('#btnDecoy')).toBeEnabled();
   });
 
+  test('プレイ中以外は操作ボタン・スティックがタップを吸わない', async ({ page }) => {
+    await waitForApp(page);
+
+    // #controls の pointer-events: none は、子の .gbtn / #stick が
+    // pointer-events: auto を持っているため、子孫まで指定しないと効かない。
+    // 透明なまま残ったボタンがタイトル / リザルトのタップを奪う原因になる。
+    const idle = await page.evaluate(() => ['btnMimic', 'btnPose', 'btnDecoy', 'stick'].map(
+      (id) => getComputedStyle(document.getElementById(id)).pointerEvents,
+    ));
+    expect(idle).toEqual(['none', 'none', 'none', 'none']);
+
+    await page.click('#btnStart');
+    await page.waitForFunction(() => window.__ningenkagu.game.state === 'playing');
+
+    // プレイ中はもちろん押せるまま
+    const playing = await page.evaluate(() => ['btnMimic', 'stick'].map(
+      (id) => getComputedStyle(document.getElementById(id)).pointerEvents,
+    ));
+    expect(playing).toEqual(['auto', 'auto']);
+  });
+
   test('擬態・ポーズボタンも同じ経路で効く', async ({ page }) => {
     await waitForApp(page);
     await page.click('#btnStart');

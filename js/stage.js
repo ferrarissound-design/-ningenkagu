@@ -33,22 +33,44 @@ export function nearestTarget(targets, x, z, maxDist = Infinity) {
   return best ? { target: best, dist: bestD } : null;
 }
 
-/** 円が矩形群にめり込まないよう押し出す。pos は Vector3(x,_,z) */
+/**
+ * 円が矩形群にめり込まないよう押し出す。pos は Vector3(x,_,z)
+ *
+ * 壁ぎわの家具（本棚・ロッカー・標本棚など）は、半径ぶん膨らませた矩形が
+ * 部屋の可動範囲をはみ出す。そちら側へ押し出すと直後のクランプで引き戻され、
+ * 家具の中にめり込んだ座標が確定してしまうため、
+ * 「押し出した先が可動範囲に収まる向き」だけを候補にする。
+ */
 export function resolveCollisions(pos, radius, solids) {
+  const pad = radius + 0.05;
+  const limitMinX = ROOM.minX + pad, limitMaxX = ROOM.maxX - pad;
+  const limitMinZ = ROOM.minZ + pad, limitMaxZ = ROOM.maxZ - pad;
+
   for (const s of solids) {
     const minX = s.minX - radius, maxX = s.maxX + radius;
     const minZ = s.minZ - radius, maxZ = s.maxZ + radius;
     if (pos.x > minX && pos.x < maxX && pos.z > minZ && pos.z < maxZ) {
-      const dl = pos.x - minX, dr = maxX - pos.x;
-      const db = pos.z - minZ, df = maxZ - pos.z;
+      const dl = minX >= limitMinX ? pos.x - minX : Infinity;
+      const dr = maxX <= limitMaxX ? maxX - pos.x : Infinity;
+      const db = minZ >= limitMinZ ? pos.z - minZ : Infinity;
+      const df = maxZ <= limitMaxZ ? maxZ - pos.z : Infinity;
       const m = Math.min(dl, dr, db, df);
-      if (m === dl) pos.x = minX;
+      // 4方向とも部屋の外（＝部屋を横断する家具）なら、従来どおり最短側へ逃がす
+      if (m === Infinity) {
+        const fl = pos.x - minX, fr = maxX - pos.x;
+        const fb = pos.z - minZ, ff = maxZ - pos.z;
+        const fm = Math.min(fl, fr, fb, ff);
+        if (fm === fl) pos.x = minX;
+        else if (fm === fr) pos.x = maxX;
+        else if (fm === fb) pos.z = minZ;
+        else pos.z = maxZ;
+      } else if (m === dl) pos.x = minX;
       else if (m === dr) pos.x = maxX;
       else if (m === db) pos.z = minZ;
       else pos.z = maxZ;
     }
   }
-  const pad = radius + 0.05;
-  pos.x = Math.max(ROOM.minX + pad, Math.min(ROOM.maxX - pad, pos.x));
-  pos.z = Math.max(ROOM.minZ + pad, Math.min(ROOM.maxZ - pad, pos.z));
+
+  pos.x = Math.max(limitMinX, Math.min(limitMaxX, pos.x));
+  pos.z = Math.max(limitMinZ, Math.min(limitMaxZ, pos.z));
 }

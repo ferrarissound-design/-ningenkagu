@@ -303,6 +303,30 @@ test.describe('アクセシビリティ', () => {
     await expect(page.locator('#toast')).toHaveText('テスト通知');
   });
 
+  test('起動失敗ダイアログにはフォーカスが移り、再読み込みできる', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+
+    // #fatal は role="dialog" aria-modal="true" を名乗る。押せる要素が1つも無いと
+    // フォーカスが背後のタイトルに取り残され、案内文どおりの再読み込みもできない。
+    await expect(page.locator('#fatal')).toHaveAttribute('role', 'dialog');
+    await expect(page.locator('#fatal')).toHaveAttribute('aria-modal', 'true');
+
+    await page.evaluate(() => {
+      document.getElementById('fatalNote').textContent = 'テスト用の起動失敗';
+      document.getElementById('fatal').classList.remove('hidden');
+    });
+
+    await expect(page.locator('#btnFatalReload')).toBeVisible();
+    await expect(page.locator('#btnFatalReload')).toBeFocused();
+
+    // 実際にページが作り直されることまで見る（ボタンが飾りになっていないこと）
+    await page.evaluate(() => { window.__reloadProbe = true; });
+    await page.click('#btnFatalReload');
+    await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
+    expect(await page.evaluate(() => window.__reloadProbe)).toBeUndefined();
+  });
+
   test('prefers-reduced-motion では明滅系のCSSアニメーションが止まる', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/index.html');
