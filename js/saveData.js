@@ -4,6 +4,7 @@
 export const PROGRESS_EXACT_KEYS = Object.freeze([
   'ningenkagu.best', // 旧バージョン互換
   'ningenkagu.stageIndex',
+  'ningenkagu.completed',
 ]);
 
 export const PROGRESS_PREFIXES = Object.freeze([
