@@ -64,17 +64,19 @@ function showFinalClear() {
   return true;
 }
 
-onGameState((state) => {
-  if (state === 'win') {
-    // Hud / main の通常リザルト描画が終わった次フレームで、最終クリアだけ上書きする。
-    window.requestAnimationFrame(showFinalClear);
-  } else if (state === 'title') {
-    syncTitleBadge();
-  }
-});
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  onGameState((state) => {
+    if (state === 'win') {
+      // Hud / main の通常リザルト描画が終わった次フレームで、最終クリアだけ上書きする。
+      window.requestAnimationFrame(showFinalClear);
+    } else if (state === 'title') {
+      syncTitleBadge();
+    }
+  });
 
-// 既に制覇済みの保存データなら、初回タイトル表示にもバッジを出す。
-syncTitleBadge();
+  // 既に制覇済みの保存データなら、初回タイトル表示にもバッジを出す。
+  syncTitleBadge();
 
-// モジュールがゲーム開始後に遅れて評価された場合の保険。
-if (getGameState() === 'win') window.requestAnimationFrame(showFinalClear);
+  // モジュールがゲーム開始後に遅れて評価された場合の保険。
+  if (getGameState() === 'win') window.requestAnimationFrame(showFinalClear);
+}
