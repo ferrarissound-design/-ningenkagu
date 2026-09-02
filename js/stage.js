@@ -2,25 +2,9 @@
 import { rectDistance, disposeObject3D } from './utils.js';
 import { ROOM } from './stageBuilder.js';
 import { getStageDefinition } from './stageRegistry.js';
+import { POSE_FOR_KIND } from './furnitureKinds.js';
 
-export { ROOM };
-
-/**
- * 擬態対象の種類ごとの「似合うポーズ」。
- * プレイヤーがこのポーズに合わせると擬態成功度が大きく上がる。
- */
-export const POSE_FOR_KIND = {
-  wall: 'stand',
-  shelf: 'tpose',
-  table: 'tpose',
-  plant: 'ypose',
-  sofa: 'crouch',
-  chair: 'crouch',
-  box: 'crouch',
-  bin: 'crouch',
-  statue: 'ypose',
-  easel: 'tpose',
-};
+export { ROOM, POSE_FOR_KIND };
 
 /**
  * main.js が globalThis.__ningenkaguStage に指定したステージを生成する。
