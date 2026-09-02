@@ -52,6 +52,13 @@ function ensurePanel() {
   const card = document.getElementById('cardInfo');
   if (!card) return null;
 
+  // 既存のミッション・鬼攻略・制覇済み表示に本パネルが加わると、
+  // 横長で高さの低い端末ではカードが画面外へ伸びることがある。
+  // 右カード自身を必要なときだけ縦スクロール可能にして操作不能を防ぐ。
+  card.style.maxHeight = 'calc(100vh - 96px)';
+  card.style.overflowY = 'auto';
+  card.style.overscrollBehaviorY = 'contain';
+
   panel = document.createElement('div');
   panel.id = 'masteryPanel';
   panel.className = 'tcard-p';
