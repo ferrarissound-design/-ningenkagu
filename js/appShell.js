@@ -99,6 +99,17 @@ function installDialogA11y(id, preferredFocusId) {
   });
 }
 
+/**
+ * 起動失敗ダイアログの「再読み込み」。
+ * #fatal は role=dialog / aria-modal=true を名乗るので、押せる要素が1つも無いと
+ * フォーカスが背後に取り残され、案内文どおりの再読み込みも自力ではできなくなる。
+ */
+function installFatalReload() {
+  const button = document.getElementById('btnFatalReload');
+  if (!button) return;
+  button.addEventListener('click', () => window.location.reload());
+}
+
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
@@ -112,6 +123,7 @@ function registerServiceWorker() {
 }
 
 installProgressReset();
+installFatalReload();
 installDialogA11y('pause', 'btnResume');
 installDialogA11y('result', 'btnRetry');
 installDialogA11y('fatal', 'btnFatalReload');

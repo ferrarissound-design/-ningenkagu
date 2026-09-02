@@ -338,7 +338,11 @@ html, body {
 /* ---------------- 操作 ---------------- */
 #controls { position: absolute; inset: 0; opacity: 0; transition: opacity .25s; }
 #ui.playing #controls { opacity: 1; }
-#ui:not(.playing) #controls { pointer-events: none; }
+/* 子側の pointer-events: auto に負けないよう、子孫まで含めて無効化する。
+   （ここが効かないと、透明なまま残った擬態・ポーズ・スティックが
+   タイトル / リザルトの操作を吸ってしまう） */
+#ui:not(.playing) #controls,
+#ui:not(.playing) #controls * { pointer-events: none; }
 #ui:not(.playing) #hud { opacity: 0; }
 
 #stick {
