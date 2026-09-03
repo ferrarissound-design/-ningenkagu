@@ -13,6 +13,8 @@ test('furniture metadata stays in sync', () => {
   for (const kind of kinds) {
     const definition = FURNITURE_KINDS[kind];
     assert.ok(VALID_POSES.has(definition.pose), `${kind} has an invalid pose`);
+    assert.equal(typeof definition.catalogName, 'string');
+    assert.ok(definition.catalogName.length > 0, `${kind} has no catalog name`);
     assert.equal(POSE_FOR_KIND[kind], definition.pose);
     assert.equal(FURNITURE_TRAITS[kind].icon, definition.icon);
     assert.equal(FURNITURE_TRAITS[kind].name, definition.name);
