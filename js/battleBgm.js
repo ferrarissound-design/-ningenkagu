@@ -10,6 +10,7 @@ import { isMuted, onMuteChange, getBgmVolume, onBgmVolumeChange } from './audio.
 import { getGameState, onGameState } from './gameState.js';
 import './opening.js';
 import './titleMenu.js';
+import './catalog.js';
 import './missionUi.js';
 import './appShell.js';
 import './completionUi.js';
