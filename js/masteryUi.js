@@ -45,6 +45,81 @@ function targetLabel(target) {
   return '';
 }
 
+// ALL CLEAR 前も特訓モードの存在は見せる。
+// 「まだ入れない報酬」が視覚で分かるよう、KEEP OUT テープ風に封印する。
+function ensureTrainingSealStyle() {
+  let style = document.getElementById('trainingSealStyle');
+  if (style) return style;
+
+  style = document.createElement('style');
+  style.id = 'trainingSealStyle';
+  style.textContent = `
+    #btnTraining.training-sealed.hidden {
+      display: block !important;
+      position: relative;
+      color: #ffe16a;
+      border-color: rgba(255, 214, 50, .92);
+      background:
+        repeating-linear-gradient(-45deg,
+          rgba(255, 210, 40, .18) 0 10px,
+          rgba(0, 0, 0, .42) 10px 20px),
+        rgba(16, 18, 20, .9);
+      box-shadow:
+        0 2px 14px rgba(0, 0, 0, .62),
+        inset 0 0 0 1px rgba(255, 214, 50, .18);
+      cursor: not-allowed;
+      opacity: .94;
+    }
+    #btnTraining.training-sealed.hidden::after {
+      content: 'KEEP OUT  •  ALL CLEARで解放';
+      display: block;
+      margin-top: 6px;
+      padding: 3px 6px;
+      border: 1px solid #111;
+      border-radius: 2px;
+      background: repeating-linear-gradient(-45deg,
+        #ffd633 0 8px,
+        #171717 8px 16px);
+      color: #fff4b2;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      line-height: 1.2;
+      text-shadow: 0 1px 2px #000;
+      transform: rotate(-1deg);
+    }
+    #btnTraining.training-sealed.hidden:hover,
+    #btnTraining.training-sealed.hidden:focus-visible {
+      color: #ffe16a;
+      background:
+        repeating-linear-gradient(-45deg,
+          rgba(255, 210, 40, .18) 0 10px,
+          rgba(0, 0, 0, .42) 10px 20px),
+        rgba(16, 18, 20, .9);
+      box-shadow:
+        0 2px 14px rgba(0, 0, 0, .62),
+        inset 0 0 0 1px rgba(255, 214, 50, .18);
+    }
+  `;
+  document.head.appendChild(style);
+  return style;
+}
+
+function syncTrainingSeal(allClear) {
+  const button = document.getElementById('btnTraining');
+  if (!button) return;
+
+  ensureTrainingSealStyle();
+  const locked = !allClear;
+  button.classList.toggle('training-sealed', locked);
+  button.disabled = locked;
+  button.setAttribute('aria-disabled', String(locked));
+  button.textContent = locked ? '🔒 特訓モード' : '特訓モード';
+  button.title = locked
+    ? `全${STAGE_DEFINITIONS.length}ステージをクリアすると解放されます`
+    : '攻略したい鬼を指名して特訓できます';
+}
+
 function ensurePanel() {
   let panel = document.getElementById('masteryPanel');
   if (panel) return panel;
@@ -146,10 +221,11 @@ let latestSnapshot = null;
 export function syncMasteryUi() {
   const panel = ensurePanel();
   const compact = ensureCompact();
-  if (!panel && !compact) return null;
-
   const data = snapshot();
   latestSnapshot = data;
+  syncTrainingSeal(data.allClear);
+  if (!panel && !compact) return data;
+
   const signature = JSON.stringify(data);
   if (signature === lastSignature) return data;
   lastSignature = signature;
