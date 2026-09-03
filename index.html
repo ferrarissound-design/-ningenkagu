@@ -104,6 +104,7 @@
 
       <nav class="menu">
         <button id="btnStart" class="mbtn accent" type="button">ゲーム開始</button>
+        <button id="btnTraining" class="mbtn hidden" type="button" aria-expanded="false">特訓モード</button>
         <button id="btnHow" class="mbtn" type="button" aria-expanded="false">あそびかた</button>
         <button id="btnConfig" class="mbtn" type="button" aria-expanded="false">設定</button>
       </nav>
@@ -177,6 +178,18 @@
           <b id="gamepadStatus" class="gpstatus">未接続</b>
         </div>
         <p class="tcard-p">ベストスコア・ベストランク・進行状況・設定はこのブラウザに保存されます。</p>
+      </div>
+
+      <div class="tcard hidden" id="cardTraining">
+        <h2 class="tcard-h">特訓モード<i>TRAINING</i></h2>
+        <p class="tcard-p"><b>ALL CLEAR特典。</b><br>攻略したい鬼を指名して、選択中のステージを何度でも練習できます。</p>
+        <div class="trainingChoices" role="group" aria-label="対戦する鬼を選ぶ">
+          <button class="trainingChoice on" type="button" data-oni-training="" aria-pressed="true"><b>🎲 通常</b><small>3戦で3タイプが一巡</small></button>
+          <button class="trainingChoice" type="button" data-oni-training="watcher" aria-pressed="false"><b>👁 見張り鬼</b><small>長い視界を遮って進む</small></button>
+          <button class="trainingChoice" type="button" data-oni-training="charger" aria-pressed="false"><b>💨 猪突猛進鬼</b><small>速い突進を見切って逃げる</small></button>
+          <button class="trainingChoice" type="button" data-oni-training="suspicious" aria-pressed="false"><b>🧐 疑り深い鬼</b><small>正確な擬態で検査を耐える</small></button>
+        </div>
+        <p class="tcard-p">特訓でもスコア・ランク・MISSION・鬼攻略は通常どおり記録されます。</p>
       </div>
     </aside>
 

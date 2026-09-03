@@ -80,7 +80,10 @@ test('parseSaveFile drops non-string values and foreign keys mixed into data', (
 });
 
 test('applySaveEntries writes every entry and reports the count written', () => {
-  const storage = new MemoryStorage();
+  const storage = new MemoryStorage({
+    'ningenkagu.oniClear.living.watcher': '1',
+    'someOtherApp.keep': 'yes',
+  });
   const written = applySaveEntries([
     ['ningenkagu.stageIndex', '4'],
     ['ningenkagu.rank.living', 'S'],
@@ -88,6 +91,20 @@ test('applySaveEntries writes every entry and reports the count written', () => 
   assert.equal(written, 2);
   assert.equal(storage.getItem('ningenkagu.stageIndex'), '4');
   assert.equal(storage.getItem('ningenkagu.rank.living'), 'S');
+  assert.equal(storage.getItem('ningenkagu.oniClear.living.watcher'), null, 'バックアップにない古い冠は残さない');
+  assert.equal(storage.getItem('someOtherApp.keep'), 'yes', '別アプリのデータは消さない');
+});
+
+test('applySaveEntries ignores unsafe direct entries even when called without parseSaveFile', () => {
+  const storage = new MemoryStorage({ 'ningenkagu.old': '1' });
+  const written = applySaveEntries([
+    ['ningenkagu.rank.living', 'S'],
+    ['foreign.key', 'do-not-write'],
+    ['ningenkagu.invalid', 3],
+  ], storage);
+  assert.equal(written, 1);
+  assert.equal(storage.getItem('ningenkagu.old'), null);
+  assert.equal(storage.getItem('foreign.key'), null);
 });
 
 test('applySaveEntries is a no-op without a storage or entries', () => {

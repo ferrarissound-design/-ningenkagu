@@ -10,6 +10,7 @@ import {
 import { ONI_PERSONALITIES, setForcedOniPersonality, getForcedOniPersonality } from './oniPersonalities.js';
 import { STAGE_EVENTS } from './stageEvents.js';
 import { STAGE_DEFINITIONS as STAGES } from './stageRegistry.js';
+import { normalizeSettingNumber } from './settings.js';
 
 const MUTE_KEY = 'ningenkagu.muted';
 const BGM_VOLUME_KEY = 'ningenkagu.bgmVolume';
@@ -190,6 +191,7 @@ function boot(renderer) {
   const resultNote = document.getElementById('resultNote');
   const btnHow = document.getElementById('btnHow');
   const btnConfig = document.getElementById('btnConfig');
+  const btnTraining = document.getElementById('btnTraining');
   const btnSound = document.getElementById('btnSound');
   const rangeBgmVolume = document.getElementById('rangeBgmVolume');
   const bgmVolumeVal = document.getElementById('bgmVolumeVal');
@@ -221,6 +223,7 @@ function boot(renderer) {
     info: document.getElementById('cardInfo'),
     how: document.getElementById('cardHow'),
     config: document.getElementById('cardConfig'),
+    training: document.getElementById('cardTraining'),
   };
 
   appEl.classList.add('titlemode');
@@ -292,6 +295,28 @@ function boot(renderer) {
     }
     if (btnHow) btnHow.setAttribute('aria-expanded', String(openCard === 'how'));
     if (btnConfig) btnConfig.setAttribute('aria-expanded', String(openCard === 'config'));
+    if (btnTraining) btnTraining.setAttribute('aria-expanded', String(openCard === 'training'));
+  }
+
+  const trainingChoices = [...document.querySelectorAll('[data-oni-training]')];
+  function syncTrainingUi() {
+    let unlocked = false;
+    try { unlocked = localStorage.getItem('ningenkagu.completed') === '1'; }
+    catch (e) { /* 保存を読めなくても通常モードで続行 */ }
+    btnTraining?.classList.toggle('hidden', !unlocked);
+    if (!unlocked) setForcedOniPersonality(null);
+
+    const selected = getForcedOniPersonality();
+    for (const button of trainingChoices) {
+      const id = button.dataset.oniTraining || null;
+      const on = (id || null) === selected;
+      button.classList.toggle('on', on);
+      button.setAttribute('aria-pressed', String(on));
+    }
+    if (btnStart) {
+      const p = selected ? ONI_PERSONALITIES[selected] : null;
+      btnStart.textContent = p ? `${p.icon} ${p.name}と特訓開始` : 'ゲーム開始';
+    }
   }
 
   /**
@@ -348,6 +373,7 @@ function boot(renderer) {
     appEl.classList.add('titlemode');
     uiEl.classList.remove('playing');
     scene.background = TITLE_BG;
+    syncTrainingUi();
   }
 
   bindTap(btnStart, beginCurrentStage);
@@ -361,6 +387,14 @@ function boot(renderer) {
   bindTap(btnResume, () => game.resume());
   bindTap(btnHow, () => showCard('how'));
   bindTap(btnConfig, () => showCard('config'));
+  bindTap(btnTraining, () => showCard('training'));
+  for (const button of trainingChoices) {
+    bindTap(button, () => {
+      setForcedOniPersonality(button.dataset.oniTraining || null);
+      syncTrainingUi();
+    });
+  }
+  syncTrainingUi();
   const toggleMute = () => {
     initAudio();
     applyMuted(!isMuted());
@@ -395,13 +429,12 @@ function boot(renderer) {
   applyMuted(savedMute);
 
   /** 0〜100 の整数として保存する。パーセント表示・スライダーの値と直接対応させる */
-  function loadPercent(key, fallback) {
-    let v = fallback;
+  function loadPercent(key, fallback, min = 0, max = 100) {
+    let raw = null;
     try {
-      const raw = parseInt(localStorage.getItem(key), 10);
-      if (Number.isFinite(raw)) v = raw;
+      raw = localStorage.getItem(key);
     } catch (e) { /* noop */ }
-    return v;
+    return normalizeSettingNumber(raw, { min, max, fallback });
   }
   function savePercent(key, v) {
     try { localStorage.setItem(key, String(v)); } catch (e) { /* noop */ }
@@ -437,7 +470,7 @@ function boot(renderer) {
 
   applyBgmVolume(loadPercent(BGM_VOLUME_KEY, 100), { persist: false });
   applySfxVolume(loadPercent(SFX_VOLUME_KEY, 100), { persist: false });
-  applySensitivity(loadPercent(SENSITIVITY_KEY, 100), { persist: false });
+  applySensitivity(loadPercent(SENSITIVITY_KEY, 100, 50, 200), { persist: false });
   let savedInvertY = false;
   try { savedInvertY = localStorage.getItem(INVERT_Y_KEY) === '1'; } catch (e) { /* noop */ }
   applyInvertY(savedInvertY, { persist: false });
@@ -475,6 +508,7 @@ function boot(renderer) {
         saveStageIndex(unlockedMax);
         syncStageUi();
       }
+      syncTrainingUi();
       if (btnRetry) {
         btnRetry.textContent = hasNext
           ? '次のステージへ'

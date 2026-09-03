@@ -5,8 +5,10 @@
 
 const btnHow = document.getElementById('btnHow');
 const btnConfig = document.getElementById('btnConfig');
+const btnTraining = document.getElementById('btnTraining');
 const cardHow = document.getElementById('cardHow');
 const cardConfig = document.getElementById('cardConfig');
+const cardTraining = document.getElementById('cardTraining');
 
 function addCloseButton(card, opener) {
   if (!card || !opener || card.querySelector('.titleCardClose')) return;
@@ -25,17 +27,21 @@ function addCloseButton(card, opener) {
 
 addCloseButton(cardHow, btnHow);
 addCloseButton(cardConfig, btnConfig);
+addCloseButton(cardTraining, btnTraining);
 
 function isOpen() {
   return btnHow?.getAttribute('aria-expanded') === 'true'
-    || btnConfig?.getAttribute('aria-expanded') === 'true';
+    || btnConfig?.getAttribute('aria-expanded') === 'true'
+    || btnTraining?.getAttribute('aria-expanded') === 'true';
 }
 
 function syncOpenState() {
   const open = isOpen();
   document.documentElement.classList.toggle('title-card-open', open);
   if (open) {
-    const active = btnHow?.getAttribute('aria-expanded') === 'true' ? cardHow : cardConfig;
+    const active = btnHow?.getAttribute('aria-expanded') === 'true'
+      ? cardHow
+      : (btnConfig?.getAttribute('aria-expanded') === 'true' ? cardConfig : cardTraining);
     if (active) active.scrollTop = 0;
   }
 }
@@ -44,5 +50,6 @@ if (btnHow && btnConfig) {
   const observer = new MutationObserver(syncOpenState);
   observer.observe(btnHow, { attributes: true, attributeFilter: ['aria-expanded'] });
   observer.observe(btnConfig, { attributes: true, attributeFilter: ['aria-expanded'] });
+  if (btnTraining) observer.observe(btnTraining, { attributes: true, attributeFilter: ['aria-expanded'] });
   syncOpenState();
 }

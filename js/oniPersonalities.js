@@ -115,6 +115,7 @@ export const ONI_PERSONALITIES = {
 
 export const ONI_PERSONALITY_IDS = Object.keys(ONI_PERSONALITIES);
 export const DEFAULT_ONI_PERSONALITY = ONI_PERSONALITY_IDS[0];
+export const ONI_CYCLE_KEY = 'ningenkagu.oniCycle';
 
 // 開発用：次のゲームで使うタイプを固定する（通常プレイでは null）
 let forcedPersonality = null;
@@ -127,8 +128,60 @@ export function setForcedOniPersonality(id) {
 
 export function getForcedOniPersonality() { return forcedPersonality; }
 
-/** ゲーム開始の瞬間に呼ぶ。3種類から均等確率で1つ選ぶ */
-export function pickOniPersonality() {
+function cycleStorage() {
+  try { return globalThis.localStorage || null; }
+  catch (e) { return null; }
+}
+
+function shuffle(ids, random) {
+  const values = [...ids];
+  for (let i = values.length - 1; i > 0; i--) {
+    const raw = Number(random());
+    const normalized = Number.isFinite(raw) ? Math.max(0, Math.min(0.999999999, raw)) : 0;
+    const j = Math.floor(normalized * (i + 1));
+    [values[i], values[j]] = [values[j], values[i]];
+  }
+  return values;
+}
+
+/** 保存済み抽選袋を検証する。壊れた値や廃止された鬼IDはここで捨てる。 */
+export function parseOniCycle(raw) {
+  try {
+    const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const last = ONI_PERSONALITIES[value?.last] ? value.last : null;
+    const remaining = [];
+    for (const id of Array.isArray(value?.remaining) ? value.remaining : []) {
+      if (ONI_PERSONALITIES[id] && !remaining.includes(id)) remaining.push(id);
+    }
+    return { remaining, last };
+  } catch (e) {
+    return { remaining: [], last: null };
+  }
+}
+
+/**
+ * ゲーム開始の瞬間に呼ぶ。通常は「抽選袋」から1体ずつ取り出すため、
+ * 3戦すれば必ず3タイプと戦える。袋を補充するときだけ順番をシャッフルする。
+ * 特訓モードの固定指定は袋を消費しない。
+ */
+export function pickOniPersonality({ storage = cycleStorage(), random = Math.random } = {}) {
   if (forcedPersonality) return forcedPersonality;
-  return ONI_PERSONALITY_IDS[Math.floor(Math.random() * ONI_PERSONALITY_IDS.length)];
+
+  let state = { remaining: [], last: null };
+  try { state = parseOniCycle(storage?.getItem(ONI_CYCLE_KEY)); }
+  catch (e) { /* 保存不能でもメモリなしの抽選として続行 */ }
+
+  if (state.remaining.length === 0) {
+    state.remaining = shuffle(ONI_PERSONALITY_IDS, random);
+    // 周回の境目でも同じ鬼が連続しないよう、先頭だけ入れ替える。
+    if (state.remaining.length > 1 && state.remaining[0] === state.last) {
+      [state.remaining[0], state.remaining[1]] = [state.remaining[1], state.remaining[0]];
+    }
+  }
+
+  const selected = state.remaining.shift() || DEFAULT_ONI_PERSONALITY;
+  state.last = selected;
+  try { storage?.setItem(ONI_CYCLE_KEY, JSON.stringify(state)); }
+  catch (e) { /* 保存できなくてもゲームは続行 */ }
+  return selected;
 }

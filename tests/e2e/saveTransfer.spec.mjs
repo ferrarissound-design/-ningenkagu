@@ -31,8 +31,12 @@ test.describe('セーブデータの書き出し／読み込み', () => {
     expect(content.data['ningenkagu.rank.living']).toBe('S');
     expect(content.data['ningenkagu.best.living']).toBe('2500');
 
-    // このブラウザの進行データを消し、書き出したファイルから復元する（機種変更・初期化復旧を模す）
-    await page.evaluate(() => localStorage.clear());
+    // 別端末側にバックアップには存在しない冠がある状態から復元する。
+    // 読み込み後に古い冠だけが合成されず、バックアップ時点へ正確に戻ることも確かめる。
+    await page.evaluate(() => {
+      localStorage.clear();
+      localStorage.setItem('ningenkagu.oniClear.living.watcher', '1');
+    });
 
     // 確認ダイアログと完了アラートの両方を受け入れる
     page.on('dialog', (dialog) => dialog.accept());
@@ -48,8 +52,9 @@ test.describe('セーブデータの書き出し／読み込み', () => {
       rank: localStorage.getItem('ningenkagu.rank.living'),
       best: localStorage.getItem('ningenkagu.best.living'),
       mission: localStorage.getItem('ningenkagu.mission.living'),
+      staleCrown: localStorage.getItem('ningenkagu.oniClear.living.watcher'),
     }));
-    expect(restored).toEqual({ rank: 'S', best: '2500', mission: '1' });
+    expect(restored).toEqual({ rank: 'S', best: '2500', mission: '1', staleCrown: null });
   });
 
   test('別アプリのファイルや壊れたJSONは拒否され、既存データを上書きしない', async ({ page }) => {
