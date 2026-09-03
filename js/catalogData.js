@@ -2,6 +2,9 @@ import { FURNITURE_KINDS } from './furnitureKinds.js';
 
 export const CATALOG_KEY = 'ningenkagu.catalog';
 export const CATALOG_KIND_IDS = Object.freeze(Object.keys(FURNITURE_KINDS));
+export const CATALOG_NAMES = Object.freeze(Object.fromEntries(
+  CATALOG_KIND_IDS.map((kind) => [kind, FURNITURE_KINDS[kind].catalogName || kind]),
+));
 const CATALOG_KIND_SET = new Set(CATALOG_KIND_IDS);
 let volatileCatalog = [];
 
