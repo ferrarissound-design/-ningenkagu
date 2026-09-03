@@ -14,6 +14,7 @@ import { Oni } from '../../js/oni.js';
 import {
   HEARING, ONI_PERSONALITIES,
   pickOniPersonality, setForcedOniPersonality, getForcedOniPersonality,
+  ONI_CYCLE_KEY, parseOniCycle,
 } from '../../js/oniPersonalities.js';
 
 function hear(player, loudness, tune = {}, stage = {}) {
@@ -169,4 +170,44 @@ test('setForcedOniPersonality で次の抽選を固定でき、null で解除で
   assert.ok(ids.size > 1, '不正な id を渡したら固定は解除されるはず');
 
   setForcedOniPersonality(null);
+});
+
+class MemoryStorage {
+  constructor() { this.map = new Map(); }
+  getItem(key) { return this.map.get(key) ?? null; }
+  setItem(key, value) { this.map.set(key, String(value)); }
+}
+
+test('通常抽選は3戦で3タイプが必ず一巡する', () => {
+  setForcedOniPersonality(null);
+  const storage = new MemoryStorage();
+  const random = () => 0;
+  const firstRound = Array.from({ length: 3 }, () => pickOniPersonality({ storage, random }));
+  assert.equal(new Set(firstRound).size, 3);
+  assert.deepEqual(new Set(firstRound), new Set(Object.keys(ONI_PERSONALITIES)));
+
+  const fourth = pickOniPersonality({ storage, random });
+  assert.notEqual(fourth, firstRound[2], '周回の境目でも同じ鬼を連続させない');
+});
+
+test('特訓の固定指定は通常抽選の残り順を消費しない', () => {
+  setForcedOniPersonality(null);
+  const storage = new MemoryStorage();
+  const first = pickOniPersonality({ storage, random: () => 0.5 });
+  const before = storage.getItem(ONI_CYCLE_KEY);
+
+  setForcedOniPersonality('watcher');
+  assert.equal(pickOniPersonality({ storage, random: () => 0.5 }), 'watcher');
+  assert.equal(storage.getItem(ONI_CYCLE_KEY), before);
+
+  setForcedOniPersonality(null);
+  const second = pickOniPersonality({ storage, random: () => 0.5 });
+  assert.notEqual(second, first);
+});
+
+test('壊れた抽選状態は安全な空の袋へ戻す', () => {
+  assert.deepEqual(parseOniCycle('{bad'), { remaining: [], last: null });
+  assert.deepEqual(parseOniCycle({ remaining: ['watcher', 'watcher', 'unknown'], last: 'unknown' }), {
+    remaining: ['watcher'], last: null,
+  });
 });

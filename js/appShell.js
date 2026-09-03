@@ -131,9 +131,13 @@ function installSaveTransfer() {
     const ok = window.confirm(`${result.entries.length}件のデータを読み込みます。現在のベストスコア・ランク・進行状況・設定は上書きされます。よろしいですか？`);
     if (!ok) return;
 
-    applySaveEntries(result.entries);
-    window.alert('読み込みました。');
-    window.location.reload();
+    try {
+      applySaveEntries(result.entries);
+      window.alert('読み込みました。');
+      window.location.reload();
+    } catch {
+      window.alert('保存領域へ書き込めず、読み込みを完了できませんでした。ページを再読み込みして状態を確認してください。');
+    }
   });
 }
 

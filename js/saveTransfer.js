@@ -53,9 +53,29 @@ export function parseSaveFile(text) {
   return { ok: true, entries };
 }
 
-/** 検証済みのエントリを実際に書き込む。書き込んだ件数を返す。 */
+/**
+ * 検証済みのエントリを実際に書き込む。書き込んだ件数を返す。
+ * 読み込みは「現在値との合成」ではなくバックアップ時点への置換にする。
+ * これにより、バックアップに無い古い冠やミッションが端末側だけ残らない。
+ */
 export function applySaveEntries(entries, storage = globalThis.localStorage) {
-  if (!storage || !entries) return 0;
-  for (const [key, value] of entries) storage.setItem(key, value);
-  return entries.length;
+  if (!storage || !Array.isArray(entries)) return 0;
+  const safeEntries = entries.filter(
+    ([key, value]) => typeof key === 'string' && key.startsWith(KEY_PREFIX) && typeof value === 'string',
+  );
+  const previous = collectSaveData(storage);
+
+  try {
+    for (const key of Object.keys(previous)) storage.removeItem(key);
+    for (const [key, value] of safeEntries) storage.setItem(key, value);
+    return safeEntries.length;
+  } catch (error) {
+    // 容量不足などで途中失敗した場合は、可能な限り読み込み前へ戻す。
+    try {
+      const current = collectSaveData(storage);
+      for (const key of Object.keys(current)) storage.removeItem(key);
+      for (const [key, value] of Object.entries(previous)) storage.setItem(key, value);
+    } catch (rollbackError) { /* 復旧不能でも元の例外を返す */ }
+    throw error;
+  }
 }
