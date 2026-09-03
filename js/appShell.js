@@ -18,18 +18,18 @@ function installProgressReset() {
   button.className = 'chipbtn';
   button.type = 'button';
   button.textContent = '初期化';
-  button.setAttribute('aria-label', 'ベストスコア、ランク、ミッション、鬼攻略、ステージ進行を初期化');
+  button.setAttribute('aria-label', 'ベストスコア、ランク、ミッション、鬼攻略、家具図鑑、ステージ進行を初期化');
 
   row.append(label, button);
 
   const note = document.createElement('p');
   note.className = 'tcard-p';
-  note.textContent = '初期化してもサウンド・音量・視点感度・Y軸反転の設定は残ります。';
+  note.textContent = 'ベスト・ランク・ミッション・鬼攻略・家具図鑑・ステージ進行を初期化します。サウンド・音量・視点感度・Y軸反転の設定は残ります。';
 
   card.append(row, note);
 
   button.addEventListener('click', () => {
-    const ok = window.confirm('ベストスコア、ランク、ミッション、鬼攻略、ステージ進行を初期化しますか？\n設定は残ります。');
+    const ok = window.confirm('ベストスコア、ランク、ミッション、鬼攻略、家具図鑑、ステージ進行を初期化しますか？\n設定は残ります。');
     if (!ok) return;
 
     clearProgressData();
@@ -90,7 +90,7 @@ function installSaveTransfer() {
 
   const note = document.createElement('p');
   note.className = 'tcard-p';
-  note.textContent = 'ベストスコア・ランク・ミッション・鬼攻略・音量などの設定を1つのファイルにまとめて書き出せます。別のブラウザや端末へ移すときや、初期化前のバックアップに使えます。';
+  note.textContent = 'ベストスコア・ランク・ミッション・鬼攻略・家具図鑑・音量などの設定を1つのファイルにまとめて書き出せます。別のブラウザや端末へ移すときや、初期化前のバックアップに使えます。';
 
   card.append(row, fileInput, note);
 
