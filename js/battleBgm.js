@@ -8,6 +8,7 @@
 // ボタンの id やキーコードは一切見ないので、UI を作り替えても壊れない。
 import { isMuted, onMuteChange, getBgmVolume, onBgmVolumeChange } from './audio.js';
 import { getGameState, onGameState } from './gameState.js';
+import './opening.js';
 import './titleMenu.js';
 import './missionUi.js';
 import './appShell.js';
