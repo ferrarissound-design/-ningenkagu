@@ -6,14 +6,20 @@ async function waitForApp(page) {
 }
 
 test.describe('特訓モードと公平な鬼抽選', () => {
-  test('ALL CLEAR前は特訓を隠し、達成後は鬼を指名して開始できる', async ({ page }) => {
+  test('ALL CLEAR前は特訓を封印表示し、達成後は鬼を指名して開始できる', async ({ page }) => {
     await waitForApp(page);
-    await expect(page.locator('#btnTraining')).toBeHidden();
+    const training = page.locator('#btnTraining');
+    await expect(training).toBeVisible();
+    await expect(training).toBeDisabled();
+    await expect(training).toContainText('🔒 特訓モード');
+    await expect(training).toHaveAttribute('aria-disabled', 'true');
 
     await page.evaluate(() => localStorage.setItem('ningenkagu.completed', '1'));
     await page.reload();
     await page.waitForFunction(() => !!window.__ningenkagu, null, { timeout: 15_000 });
-    await expect(page.locator('#btnTraining')).toBeVisible();
+    await expect(training).toBeVisible();
+    await expect(training).toBeEnabled();
+    await expect(training).toHaveAttribute('aria-disabled', 'false');
 
     await page.click('#btnTraining');
     await expect(page.locator('#cardTraining')).toBeVisible();
