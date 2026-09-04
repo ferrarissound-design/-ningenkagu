@@ -8,7 +8,9 @@ const swUrl = new URL('../../sw.js', import.meta.url);
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\const swUrl = new URL('../../sw.js', import.meta.url);');
+  // ここで扱うのは ./js/foo-bar.js のようなパスだけなので、
+  // 正規表現上意味を持つ文字を明示的にエスケープすれば十分。
+  return value.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&');
 }
 
 async function collectReachableJs(entryRelPaths) {
