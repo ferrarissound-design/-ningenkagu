@@ -901,6 +901,7 @@ export class Game {
     this.challengeResult = this.evaluateChallenge(true);
     this.oni.abortInspect();
     this.stageEvent.abort();
+    this.anomalies.abort();
     this.inspecting = false;
     this.hud.hideNotice();
     this.hud.setOniPointer(null);
