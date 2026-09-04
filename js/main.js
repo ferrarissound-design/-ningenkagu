@@ -265,9 +265,11 @@ function boot(renderer) {
       const locked = i > unlockedMax;
       const bestRank = locked ? null : loadBestRank(STAGES[i].id);
       const kishinClear = !locked && loadKishinClear(STAGES[i].id);
+      // missionUi が末尾へ付ける ★ は、モード表示の同期で消さずに引き継ぐ。
+      const missionMarked = /★\s*$/.test(btn.textContent);
       btn.disabled = locked;
       btn.textContent = (locked ? '🔒 ' : '') + (i + 1) + '　' + STAGES[i].name
-        + (bestRank ? '　' + bestRank : '') + (kishinClear ? '　🔥' : '');
+        + (bestRank ? '　' + bestRank : '') + (kishinClear ? '　🔥' : '') + (missionMarked ? '　★' : '');
       btn.classList.toggle('on', i === stageIndex && !locked);
       btn.setAttribute('aria-pressed', String(i === stageIndex));
       btn.title = locked ? '前のステージをクリアすると解放されます' : (bestRank ? `ベストランク ${bestRank}` : '未クリア');
