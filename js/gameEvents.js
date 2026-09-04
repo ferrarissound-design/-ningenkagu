@@ -5,6 +5,13 @@
 
 export const GAME_EVENT = Object.freeze({
   MIMIC: 'mimic',
+  RUN_START: 'run-start',
+  RUN_END: 'run-end',
+  KISHIN_SHIFT: 'kishin-shift',
+  ANOMALY_START: 'anomaly-start',
+  ANOMALY_END: 'anomaly-end',
+  HABIT_LEARNED: 'habit-learned',
+  DECOY: 'decoy',
 });
 
 const listeners = new Map();
