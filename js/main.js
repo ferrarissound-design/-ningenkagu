@@ -386,6 +386,10 @@ function boot(renderer) {
   }
 
   function beginCurrentStage() {
+    // プレイへ入る前にタイトルカードを基本情報へ戻す。
+    // 開いたカードの状態を持ち越すと、タイトル復帰後の最初のタップが
+    // 「開く」ではなく「閉じる」になって操作感が反転してしまう。
+    showCard('info');
     // タイトルでモードを切り替えた場合、ステージ本体も同じモードで作り直す。
     if (game.mode !== selectedGameMode) loadStage(stageIndex);
     initAudio();
