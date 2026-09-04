@@ -6,7 +6,8 @@ import { START_VIEWS } from '../../js/startViews.js';
 test('stage registry has unique ids and complete definitions', () => {
   const ids = STAGE_DEFINITIONS.map((stage) => stage.id);
   assert.equal(new Set(ids).size, ids.length);
-  assert.equal(ids.length, 5);
+  assert.equal(ids.length, 6);
+  assert.equal(ids.at(-1), 'electronics');
 
   for (const stage of STAGE_DEFINITIONS) {
     assert.equal(typeof stage.id, 'string');
