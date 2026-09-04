@@ -6,7 +6,23 @@ export const CATALOG_NAMES = Object.freeze(Object.fromEntries(
   CATALOG_KIND_IDS.map((kind) => [kind, FURNITURE_KINDS[kind].catalogName || kind]),
 ));
 const CATALOG_KIND_SET = new Set(CATALOG_KIND_IDS);
-let volatileCatalog = [];
+
+// storage への書き込みが失敗する環境（容量超過・プライベートモード制限など）でも、
+// 同じセッション中は発見済み扱いを保てるようにするための保険。
+// storage インスタンスごとに紐付けることで、テストや複数ストレージが
+// 互いの発見状況を汚染しないようにする。
+const volatileByStorage = new WeakMap();
+let volatileFallback = [];
+
+function getVolatile(resolved) {
+  if (!resolved) return volatileFallback;
+  return volatileByStorage.get(resolved) || [];
+}
+
+function setVolatile(resolved, discovered) {
+  if (!resolved) { volatileFallback = discovered; return; }
+  volatileByStorage.set(resolved, discovered);
+}
 
 function defaultStorage() {
   try { return globalThis.localStorage || null; }
@@ -24,15 +40,15 @@ export function normalizeCatalogKinds(value) {
 
 export function loadCatalog(storage = undefined) {
   const resolved = resolveStorage(storage);
-  if (!resolved) return [...volatileCatalog];
+  if (!resolved) return [...getVolatile(resolved)];
   try {
     const raw = resolved.getItem(CATALOG_KEY);
-    if (!raw) return [];
+    if (!raw) return [...getVolatile(resolved)];
     const discovered = normalizeCatalogKinds(JSON.parse(raw));
-    volatileCatalog = discovered;
+    setVolatile(resolved, discovered);
     return discovered;
   } catch (error) {
-    return [...volatileCatalog];
+    return [...getVolatile(resolved)];
   }
 }
 
@@ -70,7 +86,7 @@ export function discoverFurniture(kind, storage = undefined) {
   }
 
   const discovered = [...before, kind];
-  volatileCatalog = discovered;
+  setVolatile(resolved, discovered);
   try {
     resolved?.setItem(CATALOG_KEY, JSON.stringify(discovered));
   } catch (error) {
