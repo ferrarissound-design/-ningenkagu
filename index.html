@@ -106,6 +106,7 @@
         <button id="btnStart" class="mbtn accent" type="button">ゲーム開始</button>
         <button id="btnTraining" class="mbtn hidden" type="button" aria-expanded="false">特訓モード</button>
         <button id="btnKishin" class="mbtn" type="button" aria-expanded="false" aria-disabled="true" disabled>🔒 鬼神モード</button>
+        <button id="btnChallenge" class="mbtn" type="button" aria-expanded="false" aria-disabled="true" disabled>🔒 チャレンジ</button>
         <button id="btnHow" class="mbtn" type="button" aria-expanded="false">あそびかた</button>
         <button id="btnConfig" class="mbtn" type="button" aria-expanded="false">設定</button>
       </nav>
@@ -209,6 +210,21 @@
         </div>
         <p class="tcard-p"><b id="kishinProgress">鬼神制覇 0/5</b><br>各ステージを鬼神モードで1回ずつ突破すると KISHIN MASTER。</p>
         <p id="kishinMasterBadge" class="tcard-p hidden">🔥👑 KISHIN MASTER　全5ステージ鬼神制覇！</p>
+      </div>
+
+      <div class="tcard hidden" id="cardChallenge">
+        <h2 class="tcard-h">チャレンジ<i>CHALLENGE</i></h2>
+        <p class="tcard-p"><b>クラシック5面制覇後の条件戦。</b><br>選択中のステージで1つの縛りを背負って60秒生き残れ。</p>
+        <div class="trainingChoices" role="group" aria-label="チャレンジを選ぶ">
+          <button class="trainingChoice" type="button" data-challenge="" aria-pressed="true"><b>⚪ なし</b><small>通常ルールへ戻す</small></button>
+          <button class="trainingChoice" type="button" data-challenge="noDecoy" aria-pressed="false"><b>🚫 おとり禁止</b><small>おとり0回</small></button>
+          <button class="trainingChoice" type="button" data-challenge="oneMimic" aria-pressed="false"><b>1️⃣ 一発変装</b><small>擬態は1回だけ</small></button>
+          <button class="trainingChoice" type="button" data-challenge="noCrouch" aria-pressed="false"><b>🧍 しゃがみ禁止</b><small>しゃがんだら条件失敗</small></button>
+          <button class="trainingChoice" type="button" data-challenge="anomalyRush" aria-pressed="false"><b>👁 異変ラッシュ</b><small>異変が必ず2回</small></button>
+          <button class="trainingChoice" type="button" data-challenge="dangerDance" aria-pressed="false"><b>⚠ 危険地帯</b><small>警戒75%以上を経験</small></button>
+        </div>
+        <p class="tcard-p"><b id="challengeProgress">チャレンジ 0/5</b><br>5条件すべてを1回ずつ突破すると CHALLENGE MASTER。</p>
+        <p id="challengeMasterBadge" class="tcard-p hidden">⚡👑 CHALLENGE MASTER　全条件制覇！</p>
       </div>
     </aside>
 
