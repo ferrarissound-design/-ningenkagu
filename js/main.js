@@ -657,7 +657,10 @@ function boot(renderer) {
         syncStageUi();
         const resultTitle = document.getElementById('resultTitle');
         if (resultTitle) {
-          resultTitle.textContent = kishinState.complete ? 'KISHIN MASTER!' : '鬼神 CLEAR!';
+          const extraStage = stageIndex >= 5;
+          resultTitle.textContent = extraStage
+            ? '鬼神 EXTRA CLEAR!'
+            : (kishinState.complete ? 'KISHIN MASTER!' : '鬼神 CLEAR!');
           resultTitle.className = 'win';
         }
       }
@@ -698,9 +701,11 @@ function boot(renderer) {
       }
 
       if (kishinWin && resultNote && kishinState) {
-        resultNote.textContent = kishinState.complete
-          ? '🔥👑 全5ステージ鬼神制覇。KISHIN MASTER 達成！'
-          : `🔥 鬼神制覇 ${kishinState.count}/${kishinState.total}。次の部屋でも三相変化を耐え抜け。`;
+        resultNote.textContent = stageIndex >= 5
+          ? '🔥 EXTRA STAGEの鬼神も撃破。クラシックKISHIN MASTERの先まで制覇した。'
+          : (kishinState.complete
+            ? '🔥👑 全5ステージ鬼神制覇。KISHIN MASTER 達成！'
+            : `🔥 鬼神制覇 ${kishinState.count}/${kishinState.total}。次の部屋でも三相変化を耐え抜け。`);
       } else if (!challengeRun && hasNext && resultNote) {
         resultNote.textContent = STAGES[stageIndex].clearNote;
       }
