@@ -26,10 +26,7 @@ const STAGE_KEY = 'ningenkagu.stageIndex';
 function loadSavedStageIndex() {
   try {
     const v = parseInt(localStorage.getItem(STAGE_KEY) || '0', 10);
-    const saved = Number.isFinite(v) ? Math.max(0, Math.min(STAGES.length - 1, v)) : 0;
-    // 5面時代にALL CLEAR済みの保存データは、追加されたSTAGE 6を即解放する。
-    const classicClear = localStorage.getItem('ningenkagu.completed') === '1';
-    return classicClear && STAGES.length > 5 ? Math.max(saved, 5) : saved;
+    return Number.isFinite(v) ? Math.max(0, Math.min(STAGES.length - 1, v)) : 0;
   } catch (e) {
     return 0;
   }
@@ -111,8 +108,16 @@ function boot(renderer) {
 
   const hud = new Hud();
   // 保存値は「到達した最高ステージ」。起動時はそこを選んだ状態から始める。
-  let unlockedMax = loadSavedStageIndex();
-  let stageIndex = unlockedMax;
+  const savedStageIndex = loadSavedStageIndex();
+  let stageIndex = savedStageIndex;
+  let unlockedMax = savedStageIndex;
+  // 5面時代のALL CLEAR済みデータはSTAGE 6を解放するが、
+  // 起動時の選択ステージまでは勝手に変えない。
+  try {
+    if (localStorage.getItem('ningenkagu.completed') === '1' && STAGES.length > 5) {
+      unlockedMax = Math.max(unlockedMax, 5);
+    }
+  } catch (e) { /* 保存を読めなくても既存進行で続行 */ }
   globalThis.__ningenkaguStage = STAGES[stageIndex].id;
   hud.setStage(STAGES[stageIndex].id);
   let selectedGameMode = GAME_MODE.NORMAL;
