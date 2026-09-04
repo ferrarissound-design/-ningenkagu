@@ -2,6 +2,7 @@
 // 通常のステージ進行には触れず、ALL CLEAR 表示と制覇済みバッジだけを足す。
 import { onGameState, getGameState } from './gameState.js';
 import { STAGE_DEFINITIONS } from './stageRegistry.js';
+import { GAME_MODE } from './gameModes.js';
 
 export const COMPLETION_KEY = 'ningenkagu.completed';
 const FINAL_STAGE = STAGE_DEFINITIONS[STAGE_DEFINITIONS.length - 1];
@@ -42,6 +43,7 @@ function syncTitleBadge() {
 function showFinalClear() {
   const app = window.__ningenkagu;
   const stageId = app?.game?.stage?.id;
+  if (app?.game?.mode === GAME_MODE.KISHIN) return false;
   if (!isFinalStage(stageId)) return false;
 
   saveCompleted();

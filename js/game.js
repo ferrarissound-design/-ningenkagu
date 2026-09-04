@@ -5,13 +5,14 @@ import { buildStage, disposeStage, nearestTarget, resolveCollisions, POSE_FOR_KI
 import { Player, POSE_LABEL } from './player.js';
 import { Oni } from './oni.js';
 import { STATE } from './oniConstants.js';
-import { HEARING, pickOniPersonality } from './oniPersonalities.js';
+import { HEARING, ONI_PERSONALITY_IDS, pickOniPersonality } from './oniPersonalities.js';
 import { Effects } from './effects.js';
 import { StageEventManager, EVENT_PHASE } from './stageEvents.js';
 import { sfx } from './audio.js';
 import { setGameState } from './gameState.js';
 import { applyFurnitureTraitBonus, furnitureTraitMessage } from './furnitureTraits.js';
 import { GAME_EVENT, emitGameEvent } from './gameEvents.js';
+import { GAME_MODE, gameModeRules, normalizeGameMode } from './gameModes.js';
 
 export const CONFIG = {
   timeLimit: 60,
@@ -62,10 +63,12 @@ export function alertLevel(v) {
 }
 
 export class Game {
-  constructor(scene, camera, hud) {
+  constructor(scene, camera, hud, options = {}) {
     this.scene = scene;
     this.camera = camera;
     this.hud = hud;
+    this.mode = normalizeGameMode(options.mode);
+    this.modeRules = gameModeRules(this.mode);
 
     this.stage = buildStage(scene);
     this.player = new Player(scene);
@@ -119,10 +122,12 @@ export class Game {
     this.noiseWarned = false;
     // 鬼の短期記憶が初めて効いた瞬間だけ、理不尽感を防ぐためプレイヤーへ知らせる。
     this.memoryWarned = false;
-    this.decoyUses = CONFIG.decoy.maxUses;
+    this.decoyUses = this.modeRules.decoyUses;
     this.decoyCooldown = 0;
     this.decoyActive = false;
     this.decoyTimer = 0;
+    this.modeShiftQueue = [];
+    this.modeShiftIndex = 0;
     // ミッション判定に使うプレイ統計。
     // ゲーム本体と同じフレームで記録し、UI文言や別のRAF監視に依存させない。
     this.stats = {
@@ -186,12 +191,45 @@ export class Game {
    * （タイトル表示中やステージ選択中には変わらない。リトライ・ステージ移行では再抽選される）
    */
   start() {
-    this.oni.setPersonality(pickOniPersonality());
+    const first = this.oni.setPersonality(pickOniPersonality());
     this.reset();
+    this.prepareModeRun(first.id);
     this.setState('playing');
-    this.hud.toast('隠れろ！');
+    this.hud.toast(this.mode === GAME_MODE.KISHIN ? '鬼神に耐えろ！' : '隠れろ！');
     const p = this.oni.personality;
     this.hud.personaNotice(p.icon, p.name, p.desc);
+  }
+
+  /** 鬼神モードは1戦の中で3性格すべてへ順番に変貌する。 */
+  prepareModeRun(firstPersonalityId) {
+    this.modeShiftIndex = 0;
+    if (this.mode !== GAME_MODE.KISHIN) {
+      this.modeShiftQueue = [];
+      return;
+    }
+    const start = ONI_PERSONALITY_IDS.indexOf(firstPersonalityId);
+    const base = start >= 0 ? start : 0;
+    this.modeShiftQueue = [
+      ONI_PERSONALITY_IDS[(base + 1) % ONI_PERSONALITY_IDS.length],
+      ONI_PERSONALITY_IDS[(base + 2) % ONI_PERSONALITY_IDS.length],
+    ];
+  }
+
+  /** 残り40秒 / 20秒で鬼の性格を変え、同じ攻略法を固定させない。 */
+  updateModeShift() {
+    const thresholds = this.modeRules.personalityShiftAt;
+    const threshold = thresholds[this.modeShiftIndex];
+    if (threshold === undefined || this.timeLeft > threshold) return;
+    // 家具検査やステージイベントの途中で人格だけ変わると、予兆やイベント補正が食い違う。
+    // その状態が終わるまで変貌を保留し、次の通常AIフレームで切り替える。
+    if (this.oni.state === STATE.INSPECT || this.oni.state === STATE.EVENT || this.oni.state === STATE.FOUND) return;
+
+    const nextId = this.modeShiftQueue[this.modeShiftIndex];
+    if (!nextId) return;
+    const p = this.oni.setPersonality(nextId);
+    this.modeShiftIndex++;
+    this.hud.eventNotice('🔥 鬼相変化！', `${p.icon} ${p.name}へ変貌`, 'alarm', 1900);
+    sfx.danger();
   }
 
   pause() {
@@ -342,7 +380,7 @@ export class Game {
       const centerF = 0.4 + 0.6 * sense.centrality;
       const moveF = 1 + 1.5 * clamp(this.player.speed / 3.3, 0, 1);
       // ステージイベント中は eventDetectScale が下がる（＝気を取られている）
-      const gain = CONFIG.detectBase * tune.detectScale * this.oni.eventDetectScale
+      const gain = CONFIG.detectBase * this.modeRules.detectScale * tune.detectScale * this.oni.eventDetectScale
         * distF * centerF * moveF * (1 - this.mimicry) * sense.fraction;
       if (this.oni.state === STATE.INSPECT) {
         // 検査中は目の前で見つめられ続けるので、そのままだと必ず発見されてしまう。
@@ -364,7 +402,7 @@ export class Game {
       this.scoreSeen += add;
       this.hud.setRisk(this.risk, true);
     } else {
-      this.suspicion -= CONFIG.suspicionDecay * dt;
+      this.suspicion -= CONFIG.suspicionDecay * this.modeRules.suspicionDecayScale * dt;
       this.risk = 1;
       this.hud.setRisk(1, false);
     }
@@ -379,7 +417,7 @@ export class Game {
       sense.heard = heard.level;
       sense.hx = heard.x;
       sense.hz = heard.z;
-      if (heard.level > 0) this.suspicion = clamp(this.suspicion + CONFIG.noise.gain * heard.level * heard.level * dt, 0, 1);
+      if (heard.level > 0) this.suspicion = clamp(this.suspicion + CONFIG.noise.gain * this.modeRules.noiseScale * heard.level * heard.level * dt, 0, 1);
       if (heard.level >= HEARING.alertLevel) {
         this.stats.heardAlert = true;
         if (!this.noiseWarned) { this.noiseWarned = true; this.hud.toast('足音が聞こえた…！'); }
@@ -435,6 +473,7 @@ export class Game {
     // --- 時間と勝敗 ---
     this.timeLeft -= dt;
     this.survived = CONFIG.timeLimit - Math.max(0, this.timeLeft);
+    this.updateModeShift();
     if (this.timeLeft <= 10.5 && this.timeLeft > 0) {
       this.tickBeep -= dt;
       if (this.tickBeep <= 0) { sfx.tick(); this.tickBeep = 1.0; }
@@ -781,6 +820,7 @@ export class Game {
   }
 
   winHint() {
+    if (this.mode === GAME_MODE.KISHIN) return '鬼神の三相すべてを耐え切った。次は別ステージの鬼神制覇を狙おう。';
     if (this.score < 900) return '隠れきった。次は鬼の目の前で家具になりきるとスコアが跳ね上がる。';
     if (this.inspectPasses > 0) return '家具検査を耐え切ったのが効いた。検査中は一切動かないのがコツ。';
     if (this.evades > 0) return '目の前で見逃させるのが最高効率。もっと際どい場所を狙える。';
