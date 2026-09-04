@@ -54,4 +54,55 @@ test.describe('家具図鑑', () => {
     expect(discovery.saved).toContain(discovery.kind);
     await expect(page.locator('#popups')).toContainText(/NEW!|家具図鑑 COMPLETE/);
   });
+
+  test('図鑑を開いた状態で他のタイトルカードが開かれると図鑑側が閉じる', async ({ page }) => {
+    // 図鑑オーバーレイは #btnHow などを視覚的に覆っており、通常のポインタ操作では
+    // 到達できない（closeOtherTitleCards の逆方向がなくても実害が出にくい理由）。
+    // ここではスクリーンリーダーの仮想カーソルなど、視覚レイヤーを介さずに
+    // 他ボタンが直接 .click() されるケース（force clickも実座標では図鑑に
+    // 吸われてしまうため、要素の .click() を直接呼んで再現する）を検証する。
+    await waitForApp(page);
+
+    await page.click('#btnCatalog');
+    await expect(page.locator('#catalogOverlay')).toBeVisible();
+
+    await page.evaluate(() => document.getElementById('btnHow').click());
+    await expect(page.locator('#catalogOverlay')).toBeHidden();
+    await expect(page.locator('#btnCatalog')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#cardHow')).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(/title-card-open/);
+  });
+
+  test('保存に失敗する環境でも初回発見のNEW!表示は連打されない', async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function patchedSetItem(key, value) {
+        if (key === 'ningenkagu.catalog') {
+          throw new DOMException('QuotaExceededError', 'QuotaExceededError');
+        }
+        return original.call(this, key, value);
+      };
+    });
+    await waitForApp(page);
+    await page.click('#btnStart');
+    await page.waitForFunction(() => window.__ningenkagu.game.state === 'playing');
+
+    const result = await page.evaluate(() => {
+      const game = window.__ningenkagu.game;
+      const target = game.stage.targets.find((item) => item?.kind) || null;
+      if (!target) return null;
+      const newlyDiscoveredCount = [0, 1, 2].map(() => {
+        game.nearTarget = target;
+        const before = document.querySelectorAll('#popups .popup').length;
+        game.tryMimic();
+        const texts = [...document.querySelectorAll('#popups .popup')]
+          .slice(before)
+          .map((el) => el.textContent);
+        return texts.some((text) => text.includes('NEW!') || text.includes('COMPLETE'));
+      });
+      return newlyDiscoveredCount;
+    });
+
+    expect(result).toEqual([true, false, false]);
+  });
 });

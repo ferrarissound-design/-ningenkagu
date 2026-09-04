@@ -262,13 +262,13 @@ function installCatalogUi() {
     window.requestAnimationFrame(() => close.focus({ preventScroll: true }));
   }
 
-  function closeCatalog() {
+  function closeCatalog({ moveFocus = true } = {}) {
     overlay.classList.add('hidden');
     button.setAttribute('aria-expanded', 'false');
     const anotherOpen = ['btnHow', 'btnConfig', 'btnTraining'].some((id) =>
       document.getElementById(id)?.getAttribute('aria-expanded') === 'true');
     if (!anotherOpen) document.documentElement.classList.remove('title-card-open');
-    button.focus({ preventScroll: true });
+    if (moveFocus) button.focus({ preventScroll: true });
   }
 
   button.addEventListener('click', (event) => {
@@ -291,6 +291,19 @@ function installCatalogUi() {
     }
   });
   window.addEventListener(CATALOG_EVENT, render);
+
+  // あそびかた/設定/特訓のいずれかが開かれたときも、図鑑を開いたまま
+  // 二重に前面表示されないよう閉じる（逆方向は closeOtherTitleCards が担当）。
+  for (const id of ['btnHow', 'btnConfig', 'btnTraining']) {
+    const other = document.getElementById(id);
+    if (!other) continue;
+    const observer = new MutationObserver(() => {
+      if (other.getAttribute('aria-expanded') === 'true' && !overlay.classList.contains('hidden')) {
+        closeCatalog({ moveFocus: false });
+      }
+    });
+    observer.observe(other, { attributes: true, attributeFilter: ['aria-expanded'] });
+  }
 
   render();
 }
