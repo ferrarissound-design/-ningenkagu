@@ -9,10 +9,10 @@ test.describe('家具図鑑', () => {
   test('タイトルから開閉でき、未発見状態を表示する', async ({ page }) => {
     await waitForApp(page);
 
-    await expect(page.locator('#btnCatalog')).toContainText('家具図鑑 0/10');
+    await expect(page.locator('#btnCatalog')).toContainText('家具図鑑 0/14');
     await page.click('#btnCatalog');
     await expect(page.locator('#catalogOverlay')).toBeVisible();
-    await expect(page.locator('#catalogProgressText, .catalogProgressText')).toContainText('0/10');
+    await expect(page.locator('#catalogProgressText, .catalogProgressText')).toContainText('0/14');
     await expect(page.locator('html')).toHaveClass(/title-card-open/);
 
     await page.click('.catalogClose');
@@ -26,8 +26,8 @@ test.describe('家具図鑑', () => {
     });
     await waitForApp(page);
 
-    await expect(page.locator('#btnCatalog')).toContainText('家具図鑑 2/10');
-    await expect(page.locator('#catalogStat')).toHaveText('2/10');
+    await expect(page.locator('#btnCatalog')).toContainText('家具図鑑 2/14');
+    await expect(page.locator('#catalogStat')).toHaveText('2/14');
     await page.click('#btnCatalog');
     await expect(page.locator('.catalogEntry:not(.locked)')).toHaveCount(2);
     await expect(page.locator('.catalogEntry:not(.locked) h3')).toContainText(['テーブル・机', 'イス']);
