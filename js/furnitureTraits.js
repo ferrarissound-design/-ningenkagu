@@ -68,6 +68,24 @@ export function applyFurnitureTraitBonus(game, base) {
     case 'easel':
       if (matched && still > 0.6) bonus += 0.075;
       break;
+
+    case 'tv':
+      if (matched && still > 0.58) bonus += 0.06;
+      if (speed > 0.25) bonus -= 0.05;
+      break;
+
+    case 'fridge':
+      if (matched && still > 0.72 && distance < 1.0) bonus += 0.07;
+      break;
+
+    case 'washer':
+      if (matched && still > 0.62 && distance < 1.1) bonus += 0.06;
+      break;
+
+    case 'massage':
+      if (matched && still > 0.68) bonus += 0.075;
+      if (speed > 0.35) bonus -= 0.04;
+      break;
   }
 
   return clamp(base + bonus, 0, 0.94);
