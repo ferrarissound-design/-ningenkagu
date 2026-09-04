@@ -11,6 +11,7 @@ import { StageEventManager, EVENT_PHASE } from './stageEvents.js';
 import { sfx } from './audio.js';
 import { setGameState } from './gameState.js';
 import { applyFurnitureTraitBonus, furnitureTraitMessage } from './furnitureTraits.js';
+import { GAME_EVENT, emitGameEvent } from './gameEvents.js';
 
 export const CONFIG = {
   timeLimit: 60,
@@ -116,6 +117,8 @@ export class Game {
     this.inspectSneak = 0;
     this.inspectPasses = 0;
     this.noiseWarned = false;
+    // 鬼の短期記憶が初めて効いた瞬間だけ、理不尽感を防ぐためプレイヤーへ知らせる。
+    this.memoryWarned = false;
     this.decoyUses = CONFIG.decoy.maxUses;
     this.decoyCooldown = 0;
     this.decoyActive = false;
@@ -316,6 +319,15 @@ export class Game {
     const sense = this.oni.senseTarget(this.player, this.stage.occluders);
     sense.px = this.player.position.x;
     sense.pz = this.player.position.z;
+
+    // 同じ家具を使い回すと鬼が覚える。ただし完全な隠し補正にはせず、
+    // 初めて記憶が効いた瞬間だけ伝えて、次の立ち回りを考えられるようにする。
+    const memory = this.oni.memoryInfo?.();
+    if (sense.visible && memory?.remembered && !this.memoryWarned) {
+      this.memoryWarned = true;
+      this.hud.toast('鬼が擬態パターンを覚えてる…！ 別タイプへ');
+      sfx.warn();
+    }
 
     // --- 擬態成功度 ---
     this.updateBackdropColor();
@@ -564,6 +576,10 @@ export class Game {
     this.twitch(0.08);
     const traitMessage = furnitureTraitMessage(t.kind);
     if (traitMessage) this.hud.toast(traitMessage);
+
+    // 図鑑などの追加機能は Game.prototype を差し替えず、この通知を購読する。
+    // ゲーム本体は「擬態が成功した」という事実だけを外へ伝える。
+    emitGameEvent(GAME_EVENT.MIMIC, { game: this, target: t, kind: t.kind });
   }
 
   /**
@@ -749,6 +765,10 @@ export class Game {
   loseHint() {
     if (this.inspecting) {
       return '家具検査中に動いてしまった。鬼が背を向けても、振り返るまで完全に止まっていよう。';
+    }
+    const memory = this.oni.memoryInfo?.();
+    if (memory?.remembered) {
+      return '同じ家具や同タイプの擬態を使い回して鬼に覚えられていた。視界の外で別タイプへ擬態し直そう。';
     }
     const t = this.player.mimicTarget;
     if (!t) return '生身のままだった。家具のそばで「擬態」を押して色をコピーしよう。';
