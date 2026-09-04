@@ -90,7 +90,7 @@ export function buildElectronicsStore(scene) {
       new THREE.Vector3(-4.0, 0, -3.4),
       new THREE.Vector3(0, 0, -3.35),
       new THREE.Vector3(4.0, 0, -3.4),
-      new THREE.Vector3(6.0, 0, -4.0),
+      new THREE.Vector3(4.8, 0, -4.0),
       new THREE.Vector3(5.2, 0, 0.0),
       new THREE.Vector3(5.2, 0, 4.3),
       new THREE.Vector3(1.6, 0, 2.25),
