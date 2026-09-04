@@ -47,11 +47,13 @@ test.describe('家具図鑑', () => {
       return {
         kind: target.kind,
         saved: JSON.parse(localStorage.getItem('ningenkagu.catalog') || '[]'),
+        uses: Number(localStorage.getItem('ningenkagu.catalogUse.' + target.kind) || 0),
       };
     });
 
     expect(discovery).not.toBeNull();
     expect(discovery.saved).toContain(discovery.kind);
+    expect(discovery.uses).toBe(1);
     await expect(page.locator('#popups')).toContainText(/NEW!|家具図鑑 COMPLETE/);
   });
 
@@ -105,4 +107,18 @@ test.describe('家具図鑑', () => {
 
     expect(result).toEqual([true, false, false]);
   });
+});
+
+
+test('発見済み家具には使用回数と攻略ガイドが表示される', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('ningenkagu.catalog', JSON.stringify(['chair']));
+    localStorage.setItem('ningenkagu.catalogUse.chair', '7');
+  });
+  await waitForApp(page);
+  await page.click('#btnCatalog');
+
+  const chair = page.locator('.catalogEntry:not(.locked)').filter({ hasText: 'イス' });
+  await expect(chair).toContainText('使用 7回');
+  await expect(chair.locator('.catalogStrategy')).toContainText(/👁|💨|🧐/);
 });
