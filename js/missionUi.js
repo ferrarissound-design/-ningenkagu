@@ -155,7 +155,8 @@ function syncTitleUi(app) {
 
   const progressEl = ensureTitleOniProgress();
   if (progressEl) {
-    const stageIds = stages.map((s) => s.id).filter(Boolean);
+    // 既存の15組完全制覇をアップデートで取り消さない。STAGE 6の3鬼はEXTRA記録。
+    const stageIds = stages.slice(0, 5).map((s) => s.id).filter(Boolean);
     const progress = countOniClears(stageIds, ONI_IDS, loadOniClear);
     const stageStatus = stageOniClears(stageId, ONI_IDS, loadOniClear)
       .map(({ oniId, completed }) => {
