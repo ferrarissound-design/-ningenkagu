@@ -1,7 +1,7 @@
 // ニンゲン家具のオフライン起動用 Service Worker。
 // 初回オンライン訪問時にゲーム本体一式を保存し、以降は通信がなくても起動できる。
 
-const CACHE_NAME = 'ningenkagu-app-v8';
+const CACHE_NAME = 'ningenkagu-app-v9';
 const CORE_PATHS = [
   './',
   './index.html',
@@ -17,6 +17,7 @@ const CORE_PATHS = [
   './js/battleBgm.js',
   './js/catalog.js',
   './js/catalogData.js',
+  './js/challenges.js',
   './js/completionUi.js',
   './js/effects.js',
   './js/furnitureKinds.js',
@@ -24,6 +25,9 @@ const CORE_PATHS = [
   './js/game.js',
   './js/gameEvents.js',
   './js/gameModes.js',
+  './js/anomalies.js',
+  './js/oniAdaptation.js',
+  './js/presentationEffects.js',
   './js/gameState.js',
   './js/hud.js',
   './js/input.js',
@@ -58,6 +62,7 @@ const CORE_PATHS = [
   './js/stages/artroom.js',
   './js/stages/library.js',
   './js/stages/scienceroom.js',
+  './js/stages/electronics.js',
 ];
 
 self.addEventListener('install', (event) => {

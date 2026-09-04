@@ -46,9 +46,11 @@ test.describe('鬼神モード', () => {
     }));
     expect(first.mode).toBe('kishin');
     expect(first.decoys).toBe(1);
+    await expect(page.locator('html')).toHaveClass(/kishin-running/);
 
     await page.evaluate(() => { window.__ningenkagu.game.timeLeft = 39.8; });
     await page.waitForFunction(() => window.__ningenkagu.game.modeShiftIndex >= 1);
+    await expect(page.locator('#noticeText')).toContainText('鬼相変化');
     const second = await page.evaluate(() => window.__ningenkagu.game.oni.personality.id);
 
     await page.evaluate(() => { window.__ningenkagu.game.timeLeft = 19.8; });

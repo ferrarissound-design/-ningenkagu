@@ -19,5 +19,14 @@ test('furniture metadata stays in sync', () => {
     assert.equal(FURNITURE_TRAITS[kind].icon, definition.icon);
     assert.equal(FURNITURE_TRAITS[kind].name, definition.name);
     assert.equal(FURNITURE_TRAITS[kind].desc, definition.desc);
+    assert.equal(typeof definition.strategy, 'string');
+    assert.ok(definition.strategy.length > 0, kind + ' has no strategy guide');
+  }
+});
+
+
+test('electronics-store appliance kinds are registered', () => {
+  for (const kind of ['tv', 'fridge', 'washer', 'massage']) {
+    assert.ok(FURNITURE_KINDS[kind], kind + ' should exist');
   }
 });

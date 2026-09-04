@@ -8,6 +8,8 @@ import {
   discoverFurniture,
   loadCatalog,
   normalizeCatalogKinds,
+  loadCatalogUse,
+  recordCatalogUse,
 } from '../../js/catalogData.js';
 
 class MemoryStorage {
@@ -79,4 +81,15 @@ test('a write-blocked storage does not leak its in-memory fallback into a differ
   const other = new MemoryStorage();
   assert.deepEqual(loadCatalog(other), []);
   assert.equal(discoverFurniture('chair', other).newlyDiscovered, true);
+});
+
+
+test('catalog records furniture use counts independently from discovery', () => {
+  const storage = new MemoryStorage();
+  assert.equal(loadCatalogUse('tv', storage), 0);
+  assert.equal(recordCatalogUse('tv', storage), 1);
+  assert.equal(recordCatalogUse('tv', storage), 2);
+  discoverFurniture('tv', storage);
+  const entry = catalogEntries(storage).find((item) => item.kind === 'tv');
+  assert.equal(entry.uses, 2);
 });

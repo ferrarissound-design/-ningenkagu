@@ -32,6 +32,12 @@ export const MISSIONS = {
     desc: '蒸気発生中に7m以上移動してクリア',
     check(stats) { return (stats.steamDistance ?? 0) >= 7; },
   },
+  electronics: {
+    id: 'demo-dash',
+    name: 'デモ横断',
+    desc: '展示デモ再生中に8m以上移動してクリア',
+    check(stats) { return (stats.retailRushDistance ?? 0) >= 8; },
+  },
 };
 
 function mimicKindCount(stats) {

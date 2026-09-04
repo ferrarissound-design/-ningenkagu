@@ -8,6 +8,7 @@ import { buildClassroom } from '../../js/stages/classroom.js';
 import { buildArtRoom } from '../../js/stages/artroom.js';
 import { buildLibrary } from '../../js/stages/library.js';
 import { buildScienceRoom } from '../../js/stages/scienceroom.js';
+import { buildElectronicsStore } from '../../js/stages/electronics.js';
 
 // player.js の Player.radius と揃える（DOM/WebGL を持ち込まずに済むよう定数で持つ）
 const PLAYER_RADIUS = 0.34;
@@ -18,6 +19,7 @@ const BUILDERS = {
   artroom: buildArtRoom,
   library: buildLibrary,
   scienceroom: buildScienceRoom,
+  electronics: buildElectronicsStore,
 };
 
 /** 開始地点から視線方向へ、部屋の外へ出るまでの距離 */

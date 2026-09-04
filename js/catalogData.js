@@ -1,6 +1,7 @@
 import { FURNITURE_KINDS } from './furnitureKinds.js';
 
 export const CATALOG_KEY = 'ningenkagu.catalog';
+export const CATALOG_USE_PREFIX = 'ningenkagu.catalogUse.';
 export const CATALOG_KIND_IDS = Object.freeze(Object.keys(FURNITURE_KINDS));
 export const CATALOG_NAMES = Object.freeze(Object.fromEntries(
   CATALOG_KIND_IDS.map((kind) => [kind, FURNITURE_KINDS[kind].catalogName || kind]),
@@ -102,11 +103,32 @@ export function discoverFurniture(kind, storage = undefined) {
   };
 }
 
+export function loadCatalogUse(kind, storage = undefined) {
+  if (!CATALOG_KIND_SET.has(kind)) return 0;
+  const resolved = resolveStorage(storage);
+  try {
+    const raw = Number(resolved?.getItem(CATALOG_USE_PREFIX + kind));
+    return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0;
+  } catch (error) {
+    return 0;
+  }
+}
+
+export function recordCatalogUse(kind, storage = undefined) {
+  if (!CATALOG_KIND_SET.has(kind)) return 0;
+  const resolved = resolveStorage(storage);
+  const next = loadCatalogUse(kind, resolved) + 1;
+  try { resolved?.setItem(CATALOG_USE_PREFIX + kind, String(next)); }
+  catch (error) { /* 使用回数は補助情報なので保存失敗でもゲーム継続 */ }
+  return next;
+}
+
 export function catalogEntries(storage = undefined) {
   const discovered = new Set(loadCatalog(storage));
   return CATALOG_KIND_IDS.map((kind) => ({
     kind,
     discovered: discovered.has(kind),
+    uses: loadCatalogUse(kind, storage),
     ...FURNITURE_KINDS[kind],
   }));
 }
