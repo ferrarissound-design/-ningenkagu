@@ -11,6 +11,7 @@ import { StageEventManager, EVENT_PHASE } from './stageEvents.js';
 import { sfx } from './audio.js';
 import { setGameState } from './gameState.js';
 import { applyFurnitureTraitBonus, furnitureTraitMessage } from './furnitureTraits.js';
+import { GAME_EVENT, emitGameEvent } from './gameEvents.js';
 
 export const CONFIG = {
   timeLimit: 60,
@@ -564,6 +565,10 @@ export class Game {
     this.twitch(0.08);
     const traitMessage = furnitureTraitMessage(t.kind);
     if (traitMessage) this.hud.toast(traitMessage);
+
+    // 図鑑などの追加機能は Game.prototype を差し替えず、この通知を購読する。
+    // ゲーム本体は「擬態が成功した」という事実だけを外へ伝える。
+    emitGameEvent(GAME_EVENT.MIMIC, { game: this, target: t, kind: t.kind });
   }
 
   /**
