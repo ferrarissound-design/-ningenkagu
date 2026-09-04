@@ -238,7 +238,7 @@ window.__ningenkaguMissions = {
     ids: [...ONI_IDS],
     count: () => {
       const stages = window.__ningenkagu?.stages || [];
-      return countOniClears(stages.map((s) => s.id), ONI_IDS, loadOniClear);
+      return countOniClears(stages.slice(0, 5).map((s) => s.id), ONI_IDS, loadOniClear);
     },
   },
 };
