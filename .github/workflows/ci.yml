@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# 同じPRへ新しいコミットが来たら古い検査を止め、最新版だけを走らせる。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
