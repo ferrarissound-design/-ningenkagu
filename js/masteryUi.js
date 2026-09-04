@@ -33,7 +33,7 @@ function stageName(stageId) {
 
 function targetLabel(target) {
   if (!target) return '';
-  if (target.type === 'allClear') return `クラシック${STAGE_IDS.length}ステージ制覇`;
+  if (target.type === 'allClear') return `全${STAGE_IDS.length}ステージ制覇（クラシック）`;
   if (target.type === 'sRank') return `${stageName(target.stageId)}でSランク`;
   if (target.type === 'mission') {
     const mission = MISSIONS[target.stageId];
