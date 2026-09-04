@@ -777,7 +777,7 @@ export class Game {
     let v = 0.34 * color + 0.26 * still + 0.20 * pose + 0.20 * context;
     if (!t) v *= 0.6; // 擬態していない生身は目立つ
     const traitAdjusted = applyFurnitureTraitBonus(this, v);
-    return clamp(traitAdjusted * (this.anomalies.modifiers.mimicScale ?? 1), 0, 0.94);
+    return clamp(traitAdjusted * (this.anomalies?.modifiers?.mimicScale ?? 1), 0, 0.94);
   }
 
   /** 指定のピッチでカメラ位置を求め、遮蔽があれば手前に寄せた距離を返す */
