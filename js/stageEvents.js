@@ -151,6 +151,36 @@ export const STAGE_EVENTS = {
     onUpdate(m, dt) { m.animateSteam(dt); },
     onEnd(m) { m.setSteam(false); },
   },
+
+  // ---------------- STAGE 6：深夜の家電量販店 ----------------
+  electronics: {
+    id: 'demo',
+    name: '展示デモ一斉再生！',
+    durationMin: 7.0,
+    durationMax: 9.0,
+    liftVisionOnBreak: true,
+    onStart(m) {
+      const rig = m.stage.eventRig || {};
+      for (const screen of rig.screens || []) {
+        if (!screen?.material) continue;
+        screen.userData.demoBaseEmissive = screen.material.emissive?.getHex?.() ?? 0;
+        if (screen.material.emissive) screen.material.emissive.setHex(0x224d88);
+        screen.material.emissiveIntensity = 1.6;
+      }
+      m.applyVision({ range: 0.62, angle: 0.78, peri: 0.84, detect: 0.48 });
+      m.focusOni({ look: rig.look, spots: rig.spots, stand: 0.45, glance: 0.48 });
+      m.hud.eventNotice('📺 展示デモ一斉再生！', '画面が鬼を引きつけている');
+      sfx.eventTv();
+    },
+    onEnd(m) {
+      const rig = m.stage.eventRig || {};
+      for (const screen of rig.screens || []) {
+        if (!screen?.material) continue;
+        if (screen.material.emissive) screen.material.emissive.setHex(screen.userData.demoBaseEmissive || 0);
+        screen.material.emissiveIntensity = 1;
+      }
+    },
+  },
 };
 
 /**
