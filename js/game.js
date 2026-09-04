@@ -13,6 +13,9 @@ import { setGameState } from './gameState.js';
 import { applyFurnitureTraitBonus, furnitureTraitMessage } from './furnitureTraits.js';
 import { GAME_EVENT, emitGameEvent } from './gameEvents.js';
 import { GAME_MODE, gameModeRules, normalizeGameMode } from './gameModes.js';
+import { AnomalyManager } from './anomalies.js';
+import { OniHabitModel } from './oniAdaptation.js';
+import { challengeRules, normalizeChallengeId } from './challenges.js';
 
 export const CONFIG = {
   timeLimit: 60,
@@ -69,6 +72,8 @@ export class Game {
     this.hud = hud;
     this.mode = normalizeGameMode(options.mode);
     this.modeRules = gameModeRules(this.mode);
+    this.challengeId = normalizeChallengeId(options.challengeId);
+    this.challengeRules = challengeRules(this.challengeId);
 
     this.stage = buildStage(scene);
     this.player = new Player(scene);
@@ -91,8 +96,10 @@ export class Game {
     this.backdropColor = new THREE.Color(0xcfc7b6);
     this.defaultBackdrop = new THREE.Color(0xcfc7b6);
 
-    // ステージ固有イベント。ステージIDに対応するものが自動で選ばれる
+    // ステージ固有イベント・異変・鬼のプレイヤー習慣学習は互いに独立した担当へ分離する。
     this.stageEvent = new StageEventManager(this);
+    this.anomalies = new AnomalyManager(this);
+    this.habitModel = new OniHabitModel();
 
     this.reset();
   }
@@ -122,12 +129,16 @@ export class Game {
     this.noiseWarned = false;
     // 鬼の短期記憶が初めて効いた瞬間だけ、理不尽感を防ぐためプレイヤーへ知らせる。
     this.memoryWarned = false;
-    this.decoyUses = this.modeRules.decoyUses;
+    this.decoyUses = this.challengeRules.decoyUses ?? this.modeRules.decoyUses;
     this.decoyCooldown = 0;
     this.decoyActive = false;
     this.decoyTimer = 0;
     this.modeShiftQueue = [];
     this.modeShiftIndex = 0;
+    this.mimicUses = 0;
+    this.challengeFailed = false;
+    this.challengeFailureReason = '';
+    this.challengeResult = null;
     // ミッション判定に使うプレイ統計。
     // ゲーム本体と同じフレームで記録し、UI文言や別のRAF監視に依存させない。
     this.stats = {
@@ -137,6 +148,7 @@ export class Game {
       mimicKinds: new Set(),
       blackoutDistance: 0,
       steamDistance: 0,
+      retailRushDistance: 0,
       heardAlert: false,
     };
     // 前のプレイで指していた擬態対象を持ち越さない。
@@ -147,6 +159,8 @@ export class Game {
     this.player.reset(this.stage.playerSpawn);
     this.oni.reset();
     this.stageEvent.reset();
+    this.anomalies.reset();
+    this.habitModel.reset();
     this.camYaw = -Math.PI * 0.75;
     this.camPitch = 0.42;
     this.updateCamera(0.5, true);
@@ -180,6 +194,7 @@ export class Game {
   dispose() {
     // 明るさやテレビの演出を元に戻してから、その3Dオブジェクトを解放する
     this.stageEvent.abort();
+    this.anomalies.abort();
     disposeStage(this.stage);
     this.player.dispose();
     this.oni.dispose();
@@ -198,6 +213,7 @@ export class Game {
     this.hud.toast(this.mode === GAME_MODE.KISHIN ? '鬼神に耐えろ！' : '隠れろ！');
     const p = this.oni.personality;
     this.hud.personaNotice(p.icon, p.name, p.desc);
+    emitGameEvent(GAME_EVENT.RUN_START, { game: this, personality: p });
   }
 
   /** 鬼神モードは1戦の中で3性格すべてへ順番に変貌する。 */
@@ -228,7 +244,12 @@ export class Game {
     if (!nextId) return;
     const p = this.oni.setPersonality(nextId);
     this.modeShiftIndex++;
-    this.hud.eventNotice('🔥 鬼相変化！', `${p.icon} ${p.name}へ変貌`, 'alarm', 1900);
+    emitGameEvent(GAME_EVENT.KISHIN_SHIFT, {
+      game: this,
+      personality: p,
+      index: this.modeShiftIndex,
+      threshold,
+    });
     sfx.danger();
   }
 
@@ -294,6 +315,9 @@ export class Game {
     if (poseHits) {
       let p = this.player.pose;
       for (let i = 0; i < poseHits; i++) p = this.player.cyclePose();
+      if (this.challengeRules.forbidCrouch && p === 'crouch') {
+        this.failChallenge('しゃがみポーズを使った');
+      }
       sfx.pose();
       this.hud.toast('ポーズ：' + POSE_LABEL[p]);
       this.twitch(0.06);
@@ -341,9 +365,11 @@ export class Game {
       if (this.stage.id === 'scienceroom') this.stats.steamDistance += moved;
     }
 
-    // --- ステージ固有イベント ---
-    // 鬼の視界補正を先に反映させるため、視界判定より前に進める
+    // --- ステージ固有イベント / 異変 / プレイヤー習慣の学習 ---
+    // 視界・足音へ掛かる補正を先に確定させてから知覚判定へ進む。
     this.stageEvent.update(dt);
+    this.anomalies.update(dt);
+    this.habitModel.update(dt, this);
 
     // --- 擬態対象マーカー ---
     const near = nearestTarget(this.stage.targets, this.player.position.x, this.player.position.z, CONFIG.mimicRange);
@@ -380,7 +406,11 @@ export class Game {
       const centerF = 0.4 + 0.6 * sense.centrality;
       const moveF = 1 + 1.5 * clamp(this.player.speed / 3.3, 0, 1);
       // ステージイベント中は eventDetectScale が下がる（＝気を取られている）
-      const gain = CONFIG.detectBase * this.modeRules.detectScale * tune.detectScale * this.oni.eventDetectScale
+      const challengeDetect = this.challengeRules.detectScale ?? 1;
+      const anomalyDetect = this.anomalies.modifiers.detectScale ?? 1;
+      const habitDetect = this.habitModel.detectScale(this);
+      const gain = CONFIG.detectBase * this.modeRules.detectScale * challengeDetect * anomalyDetect
+        * habitDetect * tune.detectScale * this.oni.eventDetectScale
         * distF * centerF * moveF * (1 - this.mimicry) * sense.fraction;
       if (this.oni.state === STATE.INSPECT) {
         // 検査中は目の前で見つめられ続けるので、そのままだと必ず発見されてしまう。
@@ -402,7 +432,8 @@ export class Game {
       this.scoreSeen += add;
       this.hud.setRisk(this.risk, true);
     } else {
-      this.suspicion -= CONFIG.suspicionDecay * this.modeRules.suspicionDecayScale * dt;
+      this.suspicion -= CONFIG.suspicionDecay * this.modeRules.suspicionDecayScale
+        * (this.anomalies.modifiers.decayScale ?? 1) * dt;
       this.risk = 1;
       this.hud.setRisk(1, false);
     }
@@ -417,7 +448,13 @@ export class Game {
       sense.heard = heard.level;
       sense.hx = heard.x;
       sense.hz = heard.z;
-      if (heard.level > 0) this.suspicion = clamp(this.suspicion + CONFIG.noise.gain * this.modeRules.noiseScale * heard.level * heard.level * dt, 0, 1);
+      if (heard.level > 0) {
+        const noiseScale = (this.challengeRules.noiseScale ?? 1)
+          * (this.anomalies.modifiers.noiseScale ?? 1)
+          * this.habitModel.noiseScale();
+        this.suspicion = clamp(this.suspicion + CONFIG.noise.gain * this.modeRules.noiseScale
+          * noiseScale * heard.level * heard.level * dt, 0, 1);
+      }
       if (heard.level >= HEARING.alertLevel) {
         this.stats.heardAlert = true;
         if (!this.noiseWarned) { this.noiseWarned = true; this.hud.toast('足音が聞こえた…！'); }
@@ -601,6 +638,12 @@ export class Game {
   }
 
   tryMimic() {
+    const maxMimics = this.challengeRules.maxMimics;
+    if (Number.isFinite(maxMimics) && this.mimicUses >= maxMimics) {
+      this.hud.toast('チャレンジ条件：擬態はもう使えない');
+      sfx.deny();
+      return;
+    }
     const t = this.nearTarget;
     if (!t) {
       this.hud.toast('近くに擬態できる物がない');
@@ -608,6 +651,7 @@ export class Game {
       return;
     }
     this.player.mimic(t);
+    this.mimicUses++;
     this.stats.mimicKinds.add(t.kind);
     this.fx.burst(this.player.position, t.color);
     this.hud.popup(t.label + 'に擬態！', 'good');
@@ -662,9 +706,12 @@ export class Game {
       return;
     }
     this.decoyUses--;
+    this.habitModel.recordDecoy();
+    emitGameEvent(GAME_EVENT.DECOY, { game: this, x, z });
     this.decoyCooldown = CONFIG.decoy.cooldown;
     this.decoyActive = true;
-    this.decoyTimer = randRange(CONFIG.decoy.durationMin, CONFIG.decoy.durationMax);
+    this.decoyTimer = randRange(CONFIG.decoy.durationMin, CONFIG.decoy.durationMax)
+      * this.habitModel.decoyDurationScale();
     this.hud.setDecoy(this.decoyUses);
     this.fx.burst({ x, z }, new THREE.Color(0xffcf6b));
     this.hud.popup('おとりを投げた！', 'good');
@@ -728,7 +775,8 @@ export class Game {
     }
     let v = 0.34 * color + 0.26 * still + 0.20 * pose + 0.20 * context;
     if (!t) v *= 0.6; // 擬態していない生身は目立つ
-    return applyFurnitureTraitBonus(this, v);
+    const traitAdjusted = applyFurnitureTraitBonus(this, v);
+    return clamp(traitAdjusted * (this.anomalies.modifiers.mimicScale ?? 1), 0, 0.94);
   }
 
   /** 指定のピッチでカメラ位置を求め、遮蔽があれば手前に寄せた距離を返す */
@@ -830,8 +878,10 @@ export class Game {
   lose() {
     this.setState('lose');
     const hint = this.loseHint();
+    this.challengeResult = this.evaluateChallenge(false);
     this.oni.abortInspect();
     this.stageEvent.abort();
+    this.anomalies.abort();
     this.inspecting = false;
     this.hud.hideNotice();
     this.hud.setOniPointer(null);
@@ -841,11 +891,13 @@ export class Game {
     this.hud.setWarn(1);
     sfx.found();
     this.hud.showResult(false, Math.floor(this.score), this.survived, hint, this.scoreBreakdown());
+    emitGameEvent(GAME_EVENT.RUN_END, { game: this, win: false, challenge: this.challengeResult });
   }
 
   win() {
     this.setState('win');
     const hint = this.winHint();
+    this.challengeResult = this.evaluateChallenge(true);
     this.oni.abortInspect();
     this.stageEvent.abort();
     this.inspecting = false;
@@ -859,6 +911,32 @@ export class Game {
     sfx.win();
     this.hud.setWarn(0);
     this.hud.showResult(true, Math.floor(this.score), this.survived, hint, this.scoreBreakdown());
+    emitGameEvent(GAME_EVENT.RUN_END, { game: this, win: true, challenge: this.challengeResult });
+  }
+
+  failChallenge(reason) {
+    if (!this.challengeId || this.challengeFailed) return;
+    this.challengeFailed = true;
+    this.challengeFailureReason = reason || '条件違反';
+    this.hud.toast('⚡ チャレンジ失敗：' + this.challengeFailureReason);
+  }
+
+  evaluateChallenge(win) {
+    if (!this.challengeId) return null;
+    let completed = !!win && !this.challengeFailed;
+    let reason = this.challengeFailureReason;
+
+    const required = this.challengeRules.requireMaxSuspicion;
+    if (completed && Number.isFinite(required) && this.stats.maxSuspicion < required) {
+      completed = false;
+      reason = `警戒度${Math.round(required * 100)}%に届かなかった`;
+    }
+
+    return {
+      id: this.challengeId,
+      completed,
+      reason: completed ? '' : (reason || (win ? '条件未達成' : '発見された')),
+    };
   }
 
   /** リザルト用のスコア内訳（合計は Math.floor(this.score) と一致する） */
