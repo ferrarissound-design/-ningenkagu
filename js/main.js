@@ -12,6 +12,8 @@ import { STAGE_EVENTS } from './stageEvents.js';
 import { STAGE_DEFINITIONS as STAGES } from './stageRegistry.js';
 import { normalizeSettingNumber } from './settings.js';
 import { GAME_MODE, kishinProgress, loadKishinClear, saveKishinClear } from './gameModes.js';
+import { CHALLENGES, challengeProgress, normalizeChallengeId, saveChallengeClear } from './challenges.js';
+import './presentationEffects.js';
 
 const MUTE_KEY = 'ningenkagu.muted';
 const BGM_VOLUME_KEY = 'ningenkagu.bgmVolume';
@@ -24,7 +26,10 @@ const STAGE_KEY = 'ningenkagu.stageIndex';
 function loadSavedStageIndex() {
   try {
     const v = parseInt(localStorage.getItem(STAGE_KEY) || '0', 10);
-    return Number.isFinite(v) ? Math.max(0, Math.min(STAGES.length - 1, v)) : 0;
+    const saved = Number.isFinite(v) ? Math.max(0, Math.min(STAGES.length - 1, v)) : 0;
+    // 5面時代にALL CLEAR済みの保存データは、追加されたSTAGE 6を即解放する。
+    const classicClear = localStorage.getItem('ningenkagu.completed') === '1';
+    return classicClear && STAGES.length > 5 ? Math.max(saved, 5) : saved;
   } catch (e) {
     return 0;
   }
@@ -111,7 +116,8 @@ function boot(renderer) {
   globalThis.__ningenkaguStage = STAGES[stageIndex].id;
   hud.setStage(STAGES[stageIndex].id);
   let selectedGameMode = GAME_MODE.NORMAL;
-  let game = new Game(scene, camera, hud, { mode: selectedGameMode });
+  let selectedChallengeId = null;
+  let game = new Game(scene, camera, hud, { mode: selectedGameMode, challengeId: selectedChallengeId });
 
   const input = new Input(renderer.domElement, {
     stickEl: document.getElementById('stick'),
@@ -195,6 +201,9 @@ function boot(renderer) {
   const btnConfig = document.getElementById('btnConfig');
   const btnTraining = document.getElementById('btnTraining');
   const btnKishin = document.getElementById('btnKishin');
+  const btnChallenge = document.getElementById('btnChallenge');
+  const challengeProgressEl = document.getElementById('challengeProgress');
+  const challengeMasterBadge = document.getElementById('challengeMasterBadge');
   const kishinProgressEl = document.getElementById('kishinProgress');
   const kishinMasterBadge = document.getElementById('kishinMasterBadge');
   const btnSound = document.getElementById('btnSound');
@@ -230,6 +239,7 @@ function boot(renderer) {
     config: document.getElementById('cardConfig'),
     training: document.getElementById('cardTraining'),
     kishin: document.getElementById('cardKishin'),
+    challenge: document.getElementById('cardChallenge'),
   };
 
   appEl.classList.add('titlemode');
@@ -289,7 +299,7 @@ function boot(renderer) {
     game?.dispose();
     globalThis.__ningenkaguStage = STAGES[stageIndex].id;
     hud.setStage(STAGES[stageIndex].id);
-    game = new Game(scene, camera, hud, { mode: selectedGameMode });
+    game = new Game(scene, camera, hud, { mode: selectedGameMode, challengeId: selectedChallengeId });
     resize();
     syncStageUi();
     if (window.__ningenkagu) window.__ningenkagu.game = game;
@@ -306,10 +316,12 @@ function boot(renderer) {
     if (btnConfig) btnConfig.setAttribute('aria-expanded', String(openCard === 'config'));
     if (btnTraining) btnTraining.setAttribute('aria-expanded', String(openCard === 'training'));
     if (btnKishin) btnKishin.setAttribute('aria-expanded', String(openCard === 'kishin'));
+    if (btnChallenge) btnChallenge.setAttribute('aria-expanded', String(openCard === 'challenge'));
   }
 
   const trainingChoices = [...document.querySelectorAll('[data-oni-training]')];
   const gameModeChoices = [...document.querySelectorAll('[data-game-mode]')];
+  const challengeChoices = [...document.querySelectorAll('[data-challenge]')];
 
   function allClearUnlocked() {
     try { return localStorage.getItem('ningenkagu.completed') === '1'; }
@@ -318,6 +330,11 @@ function boot(renderer) {
 
   function syncStartLabel() {
     if (!btnStart) return;
+    const challenge = selectedChallengeId ? CHALLENGES[selectedChallengeId] : null;
+    if (challenge) {
+      btnStart.textContent = `⚡ ${challenge.name}開始`;
+      return;
+    }
     if (selectedGameMode === GAME_MODE.KISHIN) {
       btnStart.textContent = '🔥 鬼神モード開始';
       return;
@@ -346,7 +363,8 @@ function boot(renderer) {
     const unlocked = allClearUnlocked();
     if (!unlocked && selectedGameMode === GAME_MODE.KISHIN) selectedGameMode = GAME_MODE.NORMAL;
 
-    const progress = kishinProgress(STAGES.map((stage) => stage.id));
+    // KISHIN MASTERは従来の5ステージ制覇として保存。STAGE 6の🔥は追加勲章扱い。
+    const progress = kishinProgress(STAGES.slice(0, 5).map((stage) => stage.id));
     if (btnKishin) {
       btnKishin.disabled = !unlocked;
       btnKishin.setAttribute('aria-disabled', String(!unlocked));
@@ -364,6 +382,38 @@ function boot(renderer) {
       button.setAttribute('aria-pressed', String(on));
     }
     syncStageUi();
+    syncStartLabel();
+    return progress;
+  }
+
+  function syncChallengeUi() {
+    const unlocked = allClearUnlocked();
+    if (!unlocked) selectedChallengeId = null;
+    const progress = challengeProgress();
+
+    if (btnChallenge) {
+      btnChallenge.disabled = !unlocked;
+      btnChallenge.setAttribute('aria-disabled', String(!unlocked));
+      btnChallenge.textContent = unlocked
+        ? `⚡ チャレンジ　${progress.count}/${progress.total}`
+        : '🔒 チャレンジ';
+      btnChallenge.title = unlocked ? '条件付きの60秒へ挑戦' : 'クラシック5面制覇で解放';
+    }
+    if (challengeProgressEl) challengeProgressEl.textContent = `チャレンジ ${progress.count}/${progress.total}`;
+    if (challengeMasterBadge) challengeMasterBadge.classList.toggle('hidden', !progress.complete);
+
+    for (const button of challengeChoices) {
+      const id = normalizeChallengeId(button.dataset.challenge || null);
+      const on = id === selectedChallengeId;
+      button.classList.toggle('on', on);
+      button.setAttribute('aria-pressed', String(on));
+      if (id && CHALLENGES[id]) {
+        const done = progress.cleared.includes(id);
+        const small = button.querySelector('small');
+        if (small) small.dataset.cleared = done ? 'true' : 'false';
+        button.classList.toggle('complete', done);
+      }
+    }
     syncStartLabel();
     return progress;
   }
@@ -391,7 +441,7 @@ function boot(renderer) {
     // 「開く」ではなく「閉じる」になって操作感が反転してしまう。
     showCard('info');
     // タイトルでモードを切り替えた場合、ステージ本体も同じモードで作り直す。
-    if (game.mode !== selectedGameMode) loadStage(stageIndex);
+    if (game.mode !== selectedGameMode || game.challengeId !== selectedChallengeId) loadStage(stageIndex);
     initAudio();
     hud.resetVisuals();
     hud.hideResult();
@@ -403,7 +453,8 @@ function boot(renderer) {
     appEl.classList.remove('titlemode');
     scene.background = PLAY_BG;
     uiEl.classList.add('playing');
-    hud.toast(STAGES[stageIndex].label + (selectedGameMode === GAME_MODE.KISHIN ? '　🔥 鬼神に耐えろ！' : '　隠れろ！'));
+    const challenge = selectedChallengeId ? CHALLENGES[selectedChallengeId] : null;
+    hud.toast(STAGES[stageIndex].label + (challenge ? `　⚡ ${challenge.name}` : (selectedGameMode === GAME_MODE.KISHIN ? '　🔥 鬼神に耐えろ！' : '　隠れろ！')));
     input.setEnabled(true);
   }
 
@@ -430,6 +481,7 @@ function boot(renderer) {
     scene.background = TITLE_BG;
     syncTrainingUi();
     syncKishinUi();
+    syncChallengeUi();
   }
 
   bindTap(btnStart, beginCurrentStage);
@@ -445,12 +497,15 @@ function boot(renderer) {
   bindTap(btnConfig, () => showCard('config'));
   bindTap(btnTraining, () => showCard('training'));
   bindTap(btnKishin, () => showCard('kishin'));
+  bindTap(btnChallenge, () => showCard('challenge'));
   for (const button of trainingChoices) {
     bindTap(button, () => {
       selectedGameMode = GAME_MODE.NORMAL;
+      selectedChallengeId = null;
       setForcedOniPersonality(button.dataset.oniTraining || null);
       syncTrainingUi();
       syncKishinUi();
+      syncChallengeUi();
     });
   }
   for (const button of gameModeChoices) {
@@ -458,13 +513,28 @@ function boot(renderer) {
       const mode = button.dataset.gameMode;
       if (mode === GAME_MODE.KISHIN && !allClearUnlocked()) return;
       selectedGameMode = mode === GAME_MODE.KISHIN ? GAME_MODE.KISHIN : GAME_MODE.NORMAL;
+      selectedChallengeId = null;
       if (selectedGameMode === GAME_MODE.KISHIN) setForcedOniPersonality(null);
       syncTrainingUi();
       syncKishinUi();
+      syncChallengeUi();
+    });
+  }
+  for (const button of challengeChoices) {
+    bindTap(button, () => {
+      const id = normalizeChallengeId(button.dataset.challenge || null);
+      if (id && !allClearUnlocked()) return;
+      selectedChallengeId = id;
+      selectedGameMode = GAME_MODE.NORMAL;
+      setForcedOniPersonality(null);
+      syncTrainingUi();
+      syncKishinUi();
+      syncChallengeUi();
     });
   }
   syncTrainingUi();
   syncKishinUi();
+  syncChallengeUi();
   const toggleMute = () => {
     initAudio();
     applyMuted(!isMuted());
@@ -572,7 +642,9 @@ function boot(renderer) {
       uiEl.classList.remove('playing');
       const hasNext = game.state === 'win' && stageIndex < STAGES.length - 1;
       const kishinWin = game.state === 'win' && game.mode === GAME_MODE.KISHIN;
+      const challengeRun = !!game.challengeId;
       let kishinState = null;
+      let challengeState = null;
 
       if (kishinWin) {
         saveKishinClear(STAGES[stageIndex].id);
@@ -585,6 +657,24 @@ function boot(renderer) {
         }
       }
 
+      if (challengeRun) {
+        if (game.challengeResult?.completed) saveChallengeClear(game.challengeId);
+        challengeState = syncChallengeUi();
+        const def = CHALLENGES[game.challengeId];
+        const resultTitle = document.getElementById('resultTitle');
+        if (resultTitle && game.challengeResult?.completed) {
+          resultTitle.textContent = challengeState.complete ? 'CHALLENGE MASTER!' : 'CHALLENGE CLEAR!';
+          resultTitle.className = 'win';
+        }
+        if (resultNote) {
+          resultNote.textContent = game.challengeResult?.completed
+            ? (challengeState.complete
+              ? '⚡👑 全5チャレンジ制覇。CHALLENGE MASTER 達成！'
+              : `⚡ ${def?.name || 'チャレンジ'} CLEAR　${challengeState.count}/${challengeState.total}`)
+            : `⚡ ${def?.name || 'チャレンジ'} 未達成：${game.challengeResult?.reason || '条件未達成'}`;
+        }
+      }
+
       // クリアした時点で次の面を解放する。
       // 「次のステージへ」を押さずタイトルへ戻っても、進行が失われないようにする。
       if (hasNext) {
@@ -594,6 +684,7 @@ function boot(renderer) {
       }
       syncTrainingUi();
       syncKishinUi();
+      syncChallengeUi();
 
       if (btnRetry) {
         btnRetry.textContent = hasNext
@@ -605,7 +696,7 @@ function boot(renderer) {
         resultNote.textContent = kishinState.complete
           ? '🔥👑 全5ステージ鬼神制覇。KISHIN MASTER 達成！'
           : `🔥 鬼神制覇 ${kishinState.count}/${kishinState.total}。次の部屋でも三相変化を耐え抜け。`;
-      } else if (hasNext && resultNote) {
+      } else if (!challengeRun && hasNext && resultNote) {
         resultNote.textContent = STAGES[stageIndex].clearNote;
       }
     }
@@ -673,11 +764,14 @@ function boot(renderer) {
     setOniPersonality: (id) => setForcedOniPersonality(id),
     getOniPersonality: () => getForcedOniPersonality(),
     getGameMode: () => selectedGameMode,
+    getChallenge: () => selectedChallengeId,
     setGameMode: (mode) => {
       selectedGameMode = mode === GAME_MODE.KISHIN && allClearUnlocked() ? GAME_MODE.KISHIN : GAME_MODE.NORMAL;
       if (selectedGameMode === GAME_MODE.KISHIN) setForcedOniPersonality(null);
+      selectedChallengeId = null;
       syncTrainingUi();
       syncKishinUi();
+      syncChallengeUi();
       return selectedGameMode;
     },
     // ステージイベントの状態は __ningenkagu.game.stageEvent で見られる
@@ -685,6 +779,9 @@ function boot(renderer) {
     // 現在ステージのイベントを強制発生させる（プレイ中のみ・通常UIには出さない）
     triggerStageEvent: () => game.stageEvent.forceStart(),
     stageEventInfo: () => game.stageEvent.info,
+    triggerAnomaly: () => game.anomalies.forceStart(),
+    anomalyInfo: () => game.anomalies.info,
+    habitInfo: () => game.habitModel.info,
   };
 }
 
