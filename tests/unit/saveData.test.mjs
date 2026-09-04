@@ -19,6 +19,7 @@ test('progress key classifier covers every saved progression family', () => {
   assert.equal(isProgressKey('ningenkagu.rank.library'), true);
   assert.equal(isProgressKey('ningenkagu.mission.artroom'), true);
   assert.equal(isProgressKey('ningenkagu.oniClear.living.watcher'), true);
+  assert.equal(isProgressKey('ningenkagu.kishinClear.living'), true);
   assert.equal(isProgressKey('ningenkagu.bgmVolume'), false);
   assert.equal(isProgressKey('ningenkagu.lookSensitivity'), false);
 });
@@ -32,6 +33,7 @@ test('clearProgressData removes progression but preserves player settings', () =
     'ningenkagu.rank.living': 'S',
     'ningenkagu.mission.living': '1',
     'ningenkagu.oniClear.living.watcher': '1',
+    'ningenkagu.kishinClear.living': '1',
     'ningenkagu.muted': '1',
     'ningenkagu.bgmVolume': '40',
     'ningenkagu.sfxVolume': '70',
@@ -40,7 +42,7 @@ test('clearProgressData removes progression but preserves player settings', () =
   });
 
   const removed = clearProgressData(storage);
-  assert.equal(removed.length, 7);
+  assert.equal(removed.length, 8);
   assert.equal(storage.getItem('ningenkagu.stageIndex'), null);
   assert.equal(storage.getItem('ningenkagu.completed'), null);
   assert.equal(storage.getItem('ningenkagu.catalog'), null);
@@ -48,6 +50,7 @@ test('clearProgressData removes progression but preserves player settings', () =
   assert.equal(storage.getItem('ningenkagu.rank.living'), null);
   assert.equal(storage.getItem('ningenkagu.mission.living'), null);
   assert.equal(storage.getItem('ningenkagu.oniClear.living.watcher'), null);
+  assert.equal(storage.getItem('ningenkagu.kishinClear.living'), null);
 
   assert.equal(storage.getItem('ningenkagu.muted'), '1');
   assert.equal(storage.getItem('ningenkagu.bgmVolume'), '40');
