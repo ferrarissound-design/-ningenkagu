@@ -363,6 +363,7 @@ export class Game {
     if (eventPhaseDuringMove === EVENT_PHASE.ACTIVE || eventPhaseDuringMove === EVENT_PHASE.WARNING) {
       if (this.stage.id === 'artroom') this.stats.blackoutDistance += moved;
       if (this.stage.id === 'scienceroom') this.stats.steamDistance += moved;
+      if (this.stage.id === 'electronics') this.stats.retailRushDistance += moved;
     }
 
     // --- ステージ固有イベント / 異変 / プレイヤー習慣の学習 ---
