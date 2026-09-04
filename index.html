@@ -105,6 +105,7 @@
       <nav class="menu">
         <button id="btnStart" class="mbtn accent" type="button">ゲーム開始</button>
         <button id="btnTraining" class="mbtn hidden" type="button" aria-expanded="false">特訓モード</button>
+        <button id="btnKishin" class="mbtn" type="button" aria-expanded="false" aria-disabled="true" disabled>🔒 鬼神モード</button>
         <button id="btnHow" class="mbtn" type="button" aria-expanded="false">あそびかた</button>
         <button id="btnConfig" class="mbtn" type="button" aria-expanded="false">設定</button>
       </nav>
@@ -191,6 +192,23 @@
           <button class="trainingChoice" type="button" data-oni-training="suspicious" aria-pressed="false"><b>🧐 疑り深い鬼</b><small>正確な擬態で検査を耐える</small></button>
         </div>
         <p class="tcard-p">特訓でもスコア・ランク・MISSION・鬼攻略は通常どおり記録されます。</p>
+      </div>
+
+      <div class="tcard hidden" id="cardKishin">
+        <h2 class="tcard-h">鬼神モード<i>KISHIN</i></h2>
+        <p class="tcard-p"><b>ALL CLEAR後のボスモード。</b><br>1回の60秒で鬼が3つの性格すべてへ変貌する。残り40秒・20秒で攻略法が強制的に切り替わる。</p>
+        <ul class="tkeys">
+          <li><span>鬼相変化</span><b>40秒 / 20秒</b></li>
+          <li><span>警戒上昇</span><b>強化</b></li>
+          <li><span>警戒回復</span><b>遅い</b></li>
+          <li><span>おとり</span><b>1回だけ</b></li>
+        </ul>
+        <div class="trainingChoices" role="group" aria-label="ゲームモードを選ぶ">
+          <button class="trainingChoice on" type="button" data-game-mode="normal" aria-pressed="true"><b>🎲 通常モード</b><small>いつもの60秒</small></button>
+          <button class="trainingChoice" type="button" data-game-mode="kishin" aria-pressed="false"><b>🔥 鬼神モード</b><small>3性格連戦の高難度</small></button>
+        </div>
+        <p class="tcard-p"><b id="kishinProgress">鬼神制覇 0/5</b><br>各ステージを鬼神モードで1回ずつ突破すると KISHIN MASTER。</p>
+        <p id="kishinMasterBadge" class="tcard-p hidden">🔥👑 KISHIN MASTER　全5ステージ鬼神制覇！</p>
       </div>
     </aside>
 
