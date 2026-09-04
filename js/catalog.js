@@ -6,6 +6,7 @@ import {
   catalogEntries,
   catalogProgress,
   discoverFurniture,
+  recordCatalogUse,
 } from './catalogData.js';
 import { GAME_EVENT, onGameEvent } from './gameEvents.js';
 
@@ -27,19 +28,21 @@ function installMimicDiscovery() {
   onGameEvent(GAME_EVENT.MIMIC, ({ game, target }) => {
     if (!game || !target || !FURNITURE_KINDS[target.kind]) return;
 
+    const uses = recordCatalogUse(target.kind);
     const progress = discoverFurniture(target.kind);
-    if (!progress.newlyDiscovered) return;
 
-    const icon = FURNITURE_KINDS[target.kind].icon || '🪑';
-    const name = CATALOG_NAMES[target.kind] || target.label || target.kind;
-    if (progress.complete) {
-      game.hud.popup('👑 家具図鑑 COMPLETE！ 家具博士！', 'good big');
-    } else {
-      game.hud.popup(`NEW! 図鑑登録 ${icon} ${name}　${progress.count}/${progress.total}`, 'good big');
+    if (progress.newlyDiscovered) {
+      const icon = FURNITURE_KINDS[target.kind].icon || '🪑';
+      const name = CATALOG_NAMES[target.kind] || target.label || target.kind;
+      if (progress.complete) {
+        game.hud.popup('👑 家具図鑑 COMPLETE！ 家具博士！', 'good big');
+      } else {
+        game.hud.popup(`NEW! 図鑑登録 ${icon} ${name}　${progress.count}/${progress.total}`, 'good big');
+      }
     }
 
     window.dispatchEvent(new CustomEvent(CATALOG_EVENT, {
-      detail: { ...progress, kind: target.kind },
+      detail: { ...progress, kind: target.kind, uses },
     }));
   });
 }
@@ -104,6 +107,8 @@ function installStyles() {
     .catalogEntry h3 { margin: 0 0 5px; font-size: 17px; }
     .catalogEntry .catalogTrait { margin: 0 0 7px; font-size: 12px; font-weight: 800; opacity: .72; }
     .catalogEntry .catalogDesc { margin: 0; font-size: 12px; line-height: 1.5; opacity: .78; }
+    .catalogEntry .catalogUses { margin: 8px 0 4px; font-size: 11px; font-weight: 900; opacity: .72; }
+    .catalogEntry .catalogStrategy { margin: 0; padding-top: 7px; border-top: 1px solid rgba(255,255,255,.09); font-size: 11px; line-height: 1.48; opacity: .9; }
     .catalogEntry.locked .catalogEntryIcon { filter: grayscale(1); }
     .catalogEntry.locked p { margin: 5px 0 0; font-size: 11px; opacity: .8; }
     @media (max-width: 560px) {
@@ -175,7 +180,7 @@ function installCatalogUi() {
 
   const lead = document.createElement('p');
   lead.className = 'catalogLead';
-  lead.textContent = 'ゲーム中に一度でも擬態した家具タイプが登録される。クリアだけでは埋まらない、カグミンの変身記録。';
+  lead.textContent = '擬態した家具を記録し、使用回数と鬼タイプ別の使いどころまで残す攻略図鑑。';
 
   const progressRow = document.createElement('div');
   progressRow.className = 'catalogProgressRow';
@@ -227,7 +232,13 @@ function installCatalogUi() {
         const desc = document.createElement('p');
         desc.className = 'catalogDesc';
         desc.textContent = entry.desc;
-        card.append(trait, desc);
+        const uses = document.createElement('p');
+        uses.className = 'catalogUses';
+        uses.textContent = `使用 ${entry.uses || 0}回`;
+        const strategy = document.createElement('p');
+        strategy.className = 'catalogStrategy';
+        strategy.textContent = entry.strategy || '攻略データ解析中';
+        card.append(trait, desc, uses, strategy);
       } else {
         const hint = document.createElement('p');
         hint.textContent = 'どこかのステージで擬態すると登録';
