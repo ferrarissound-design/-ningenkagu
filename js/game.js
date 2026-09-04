@@ -220,8 +220,9 @@ export class Game {
     const thresholds = this.modeRules.personalityShiftAt;
     const threshold = thresholds[this.modeShiftIndex];
     if (threshold === undefined || this.timeLeft > threshold) return;
-    // 家具検査の途中で人格だけ変わると予兆と判定が食い違うため、検査完了まで待つ。
-    if (this.oni.state === STATE.INSPECT || this.oni.state === STATE.FOUND) return;
+    // 家具検査やステージイベントの途中で人格だけ変わると、予兆やイベント補正が食い違う。
+    // その状態が終わるまで変貌を保留し、次の通常AIフレームで切り替える。
+    if (this.oni.state === STATE.INSPECT || this.oni.state === STATE.EVENT || this.oni.state === STATE.FOUND) return;
 
     const nextId = this.modeShiftQueue[this.modeShiftIndex];
     if (!nextId) return;
