@@ -10,7 +10,8 @@ import { buildMasterySnapshot, nextMasteryTarget } from './mastery.js';
 
 const RANK_KEY_PREFIX = 'ningenkagu.rank.';
 const MISSION_KEY_PREFIX = 'ningenkagu.mission.';
-const STAGE_IDS = STAGE_DEFINITIONS.map((stage) => stage.id);
+const CLASSIC_STAGES = STAGE_DEFINITIONS.slice(0, 5);
+const STAGE_IDS = CLASSIC_STAGES.map((stage) => stage.id);
 
 function read(key) {
   try { return localStorage.getItem(key); }
@@ -32,7 +33,7 @@ function stageName(stageId) {
 
 function targetLabel(target) {
   if (!target) return '';
-  if (target.type === 'allClear') return `全${STAGE_DEFINITIONS.length}ステージ制覇`;
+  if (target.type === 'allClear') return `クラシック${STAGE_IDS.length}ステージ制覇`;
   if (target.type === 'sRank') return `${stageName(target.stageId)}でSランク`;
   if (target.type === 'mission') {
     const mission = MISSIONS[target.stageId];
@@ -116,7 +117,7 @@ function syncTrainingSeal(allClear) {
   button.setAttribute('aria-disabled', String(locked));
   button.textContent = locked ? '🔒 特訓モード' : '特訓モード';
   button.title = locked
-    ? `全${STAGE_DEFINITIONS.length}ステージをクリアすると解放されます`
+    ? `クラシック${STAGE_IDS.length}ステージをクリアすると解放されます`
     : '攻略したい鬼を指名して特訓できます';
 }
 
