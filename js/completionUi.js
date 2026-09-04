@@ -71,7 +71,7 @@ function syncTitleBadge() {
 function showFinalClear() {
   const app = window.__ningenkagu;
   const stageId = app?.game?.stage?.id;
-  if (app?.game?.mode === GAME_MODE.KISHIN) return false;
+  if (app?.game?.mode === GAME_MODE.KISHIN || app?.game?.challengeId) return false;
 
   const title = document.getElementById('resultTitle');
   const note = document.getElementById('resultNote');
