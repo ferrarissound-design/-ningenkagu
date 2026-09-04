@@ -15,11 +15,14 @@ test.describe('大型アップデートの動的システム', () => {
     const started = await page.evaluate(() => window.__ningenkagu.triggerAnomaly());
     expect(started).toBe(true);
 
-    const info = await page.evaluate(() => window.__ningenkagu.anomalyInfo());
-    expect(info.active).not.toBeNull();
-    expect(info.count).toBe(1);
+    const state = await page.evaluate(() => ({
+      info: window.__ningenkagu.anomalyInfo(),
+      fxClass: document.getElementById('majorFx')?.className || '',
+    }));
+    expect(state.info.active).not.toBeNull();
+    expect(state.info.count).toBe(1);
+    expect(state.fxClass).toContain('anomaly');
     await expect(page.locator('#noticeText')).toContainText('異変');
-    await expect(page.locator('#majorFx')).toHaveClass(/anomaly/);
   });
 
   test('隅待ちを続けると鬼がクセを読み、プレイヤーへ通知される', async ({ page }) => {
