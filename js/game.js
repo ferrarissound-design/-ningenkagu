@@ -325,7 +325,7 @@ export class Game {
     const memory = this.oni.memoryInfo?.();
     if (sense.visible && memory?.remembered && !this.memoryWarned) {
       this.memoryWarned = true;
-      this.hud.toast('鬼がその家具を覚えてる…！ 別の擬態へ');
+      this.hud.toast('鬼が擬態パターンを覚えてる…！ 別タイプへ');
       sfx.warn();
     }
 
@@ -768,7 +768,7 @@ export class Game {
     }
     const memory = this.oni.memoryInfo?.();
     if (memory?.remembered) {
-      return '同じ家具を使い回して鬼に覚えられていた。視界の外で別タイプの家具へ擬態し直そう。';
+      return '同じ家具や同タイプの擬態を使い回して鬼に覚えられていた。視界の外で別タイプへ擬態し直そう。';
     }
     const t = this.player.mimicTarget;
     if (!t) return '生身のままだった。家具のそばで「擬態」を押して色をコピーしよう。';
