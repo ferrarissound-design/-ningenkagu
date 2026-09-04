@@ -1,6 +1,5 @@
 // 家具図鑑。
 // 「クリアしたか」だけでなく「何になって遊んだか」を残し、探索そのものをリプレイ動機にする。
-import { Game } from './game.js';
 import { FURNITURE_KINDS } from './furnitureKinds.js';
 import {
   CATALOG_NAMES,
@@ -8,6 +7,7 @@ import {
   catalogProgress,
   discoverFurniture,
 } from './catalogData.js';
+import { GAME_EVENT, onGameEvent } from './gameEvents.js';
 
 const POSE_NAMES = Object.freeze({
   stand: '直立',
@@ -18,39 +18,30 @@ const POSE_NAMES = Object.freeze({
 
 const CATALOG_EVENT = 'ningenkagu:catalog-change';
 
-function patchMimicDiscovery() {
-  if (Game.prototype.__catalogDiscoveryPatched) return;
-  const original = Game.prototype.tryMimic;
-  if (typeof original !== 'function') return;
+let mimicDiscoveryInstalled = false;
 
-  Object.defineProperty(Game.prototype, '__catalogDiscoveryPatched', {
-    value: true,
-    configurable: false,
-    enumerable: false,
-    writable: false,
-  });
+function installMimicDiscovery() {
+  if (mimicDiscoveryInstalled) return;
+  mimicDiscoveryInstalled = true;
 
-  Game.prototype.tryMimic = function tryMimicWithCatalog(...args) {
-    const target = this.nearTarget;
-    const result = original.apply(this, args);
-    if (!target || !FURNITURE_KINDS[target.kind]) return result;
+  onGameEvent(GAME_EVENT.MIMIC, ({ game, target }) => {
+    if (!game || !target || !FURNITURE_KINDS[target.kind]) return;
 
     const progress = discoverFurniture(target.kind);
-    if (!progress.newlyDiscovered) return result;
+    if (!progress.newlyDiscovered) return;
 
     const icon = FURNITURE_KINDS[target.kind].icon || '🪑';
     const name = CATALOG_NAMES[target.kind] || target.label || target.kind;
     if (progress.complete) {
-      this.hud.popup('👑 家具図鑑 COMPLETE！ 家具博士！', 'good big');
+      game.hud.popup('👑 家具図鑑 COMPLETE！ 家具博士！', 'good big');
     } else {
-      this.hud.popup(`NEW! 図鑑登録 ${icon} ${name}　${progress.count}/${progress.total}`, 'good big');
+      game.hud.popup(`NEW! 図鑑登録 ${icon} ${name}　${progress.count}/${progress.total}`, 'good big');
     }
 
     window.dispatchEvent(new CustomEvent(CATALOG_EVENT, {
       detail: { ...progress, kind: target.kind },
     }));
-    return result;
-  };
+  });
 }
 
 function installStyles() {
@@ -308,5 +299,5 @@ function installCatalogUi() {
   render();
 }
 
-patchMimicDiscovery();
+installMimicDiscovery();
 installCatalogUi();
