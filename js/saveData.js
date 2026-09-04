@@ -1,10 +1,11 @@
 // 進行データだけを安全に初期化するための小さな保存ユーティリティ。
-// 音量・視点感度などの設定は残し、ベスト・ランク・ミッション・鬼攻略・鬼神攻略・到達ステージ・家具図鑑だけを消す。
+// 音量・視点感度などの設定は残し、ベスト・ランク・ミッション・鬼攻略・鬼神攻略・チャレンジ・到達ステージ・家具図鑑だけを消す。
 
 export const PROGRESS_EXACT_KEYS = Object.freeze([
   'ningenkagu.best', // 旧バージョン互換
   'ningenkagu.stageIndex',
   'ningenkagu.completed',
+  'ningenkagu.completed6',
   'ningenkagu.catalog',
 ]);
 
@@ -14,6 +15,8 @@ export const PROGRESS_PREFIXES = Object.freeze([
   'ningenkagu.mission.',
   'ningenkagu.oniClear.',
   'ningenkagu.kishinClear.',
+  'ningenkagu.challengeClear.',
+  'ningenkagu.catalogUse.',
 ]);
 
 export function isProgressKey(key) {
