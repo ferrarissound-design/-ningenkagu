@@ -565,6 +565,20 @@ function boot(renderer) {
       input.setEnabled(false);
       uiEl.classList.remove('playing');
       const hasNext = game.state === 'win' && stageIndex < STAGES.length - 1;
+      const kishinWin = game.state === 'win' && game.mode === GAME_MODE.KISHIN;
+      let kishinState = null;
+
+      if (kishinWin) {
+        saveKishinClear(STAGES[stageIndex].id);
+        kishinState = syncKishinUi();
+        syncStageUi();
+        const resultTitle = document.getElementById('resultTitle');
+        if (resultTitle) {
+          resultTitle.textContent = kishinState.complete ? 'KISHIN MASTER!' : '鬼神 CLEAR!';
+          resultTitle.className = 'win';
+        }
+      }
+
       // クリアした時点で次の面を解放する。
       // 「次のステージへ」を押さずタイトルへ戻っても、進行が失われないようにする。
       if (hasNext) {
@@ -573,12 +587,19 @@ function boot(renderer) {
         syncStageUi();
       }
       syncTrainingUi();
+      syncKishinUi();
+
       if (btnRetry) {
         btnRetry.textContent = hasNext
           ? '次のステージへ'
           : (stageIndex === STAGES.length - 1 && game.state === 'win' ? STAGES[stageIndex].name + 'をもう一度' : 'もう一度遊ぶ');
       }
-      if (hasNext && resultNote) {
+
+      if (kishinWin && resultNote && kishinState) {
+        resultNote.textContent = kishinState.complete
+          ? '🔥👑 全5ステージ鬼神制覇。KISHIN MASTER 達成！'
+          : `🔥 鬼神制覇 ${kishinState.count}/${kishinState.total}。次の部屋でも三相変化を耐え抜け。`;
+      } else if (hasNext && resultNote) {
         resultNote.textContent = STAGES[stageIndex].clearNote;
       }
     }
@@ -645,6 +666,14 @@ function boot(renderer) {
     // 次のゲームの鬼タイプを固定する。null / 不正な id で通常のランダムへ戻す
     setOniPersonality: (id) => setForcedOniPersonality(id),
     getOniPersonality: () => getForcedOniPersonality(),
+    getGameMode: () => selectedGameMode,
+    setGameMode: (mode) => {
+      selectedGameMode = mode === GAME_MODE.KISHIN && allClearUnlocked() ? GAME_MODE.KISHIN : GAME_MODE.NORMAL;
+      if (selectedGameMode === GAME_MODE.KISHIN) setForcedOniPersonality(null);
+      syncTrainingUi();
+      syncKishinUi();
+      return selectedGameMode;
+    },
     // ステージイベントの状態は __ningenkagu.game.stageEvent で見られる
     stageEvents: STAGE_EVENTS,
     // 現在ステージのイベントを強制発生させる（プレイ中のみ・通常UIには出さない）
