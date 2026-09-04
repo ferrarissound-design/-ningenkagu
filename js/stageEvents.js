@@ -363,8 +363,8 @@ export class StageEventManager {
   /** 開発用：今すぐ発生させる */
   forceStart() {
     if (!this.spec) return false;
-    if (this.game.state !== 'playing') return false;
     if (this.phase === EVENT_PHASE.ACTIVE || this.phase === EVENT_PHASE.WARNING) return false;
+    if (!this.canStart()) return false;
     return this.begin();
   }
 
