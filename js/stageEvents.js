@@ -302,6 +302,9 @@ export class StageEventManager {
     // プレイヤーの「おとり」など、別の場所からすでに気を引いている最中は重ねない
     if (this.oni.eventFocus) return false;
     if (g.suspicion >= 0.8) return false;
+    // 異変と通常ステージイベントは同時に重ねない。どちらが原因で
+    // 状況が変わったのかプレイヤーが読めることを優先する。
+    if (g.anomalies?.active) return false;
     return true;
   }
 
