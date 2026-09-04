@@ -117,6 +117,8 @@ export class Game {
     this.inspectSneak = 0;
     this.inspectPasses = 0;
     this.noiseWarned = false;
+    // 鬼の短期記憶が初めて効いた瞬間だけ、理不尽感を防ぐためプレイヤーへ知らせる。
+    this.memoryWarned = false;
     this.decoyUses = CONFIG.decoy.maxUses;
     this.decoyCooldown = 0;
     this.decoyActive = false;
@@ -317,6 +319,15 @@ export class Game {
     const sense = this.oni.senseTarget(this.player, this.stage.occluders);
     sense.px = this.player.position.x;
     sense.pz = this.player.position.z;
+
+    // 同じ家具を使い回すと鬼が覚える。ただし完全な隠し補正にはせず、
+    // 初めて記憶が効いた瞬間だけ伝えて、次の立ち回りを考えられるようにする。
+    const memory = this.oni.memoryInfo?.();
+    if (sense.visible && memory?.remembered && !this.memoryWarned) {
+      this.memoryWarned = true;
+      this.hud.toast('鬼がその家具を覚えてる…！ 別の擬態へ');
+      sfx.warn();
+    }
 
     // --- 擬態成功度 ---
     this.updateBackdropColor();
@@ -754,6 +765,10 @@ export class Game {
   loseHint() {
     if (this.inspecting) {
       return '家具検査中に動いてしまった。鬼が背を向けても、振り返るまで完全に止まっていよう。';
+    }
+    const memory = this.oni.memoryInfo?.();
+    if (memory?.remembered) {
+      return '同じ家具を使い回して鬼に覚えられていた。視界の外で別タイプの家具へ擬態し直そう。';
     }
     const t = this.player.mimicTarget;
     if (!t) return '生身のままだった。家具のそばで「擬態」を押して色をコピーしよう。';
