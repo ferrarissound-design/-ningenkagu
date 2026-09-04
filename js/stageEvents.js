@@ -161,25 +161,13 @@ export const STAGE_EVENTS = {
     liftVisionOnBreak: true,
     onStart(m) {
       const rig = m.stage.eventRig || {};
-      for (const screen of rig.screens || []) {
-        if (!screen?.material) continue;
-        screen.userData.demoBaseEmissive = screen.material.emissive?.getHex?.() ?? 0;
-        if (screen.material.emissive) screen.material.emissive.setHex(0x224d88);
-        screen.material.emissiveIntensity = 1.6;
-      }
+      m.setDemoScreens(true);
       m.applyVision({ range: 0.62, angle: 0.78, peri: 0.84, detect: 0.48 });
       m.focusOni({ look: rig.look, spots: rig.spots, stand: 0.45, glance: 0.48 });
       m.hud.eventNotice('📺 展示デモ一斉再生！', '画面が鬼を引きつけている');
       sfx.eventTv();
     },
-    onEnd(m) {
-      const rig = m.stage.eventRig || {};
-      for (const screen of rig.screens || []) {
-        if (!screen?.material) continue;
-        if (screen.material.emissive) screen.material.emissive.setHex(screen.userData.demoBaseEmissive || 0);
-        screen.material.emissiveIntensity = 1;
-      }
-    },
+    onEnd(m) { m.setDemoScreens(false); },
   },
 };
 
@@ -229,6 +217,7 @@ export class StageEventManager {
     this.phase = EVENT_PHASE.IDLE;
     this.setTv(false);
     this.setSteam(false);
+    this.setDemoScreens(false);
     this.dim = 0;
     this.dimTarget = 0;
     this.applyLights();
@@ -475,6 +464,37 @@ export class StageEventManager {
     } else {
       mat.emissive.setHex(0x000000);
       mat.emissiveIntensity = 1;
+    }
+  }
+
+  /**
+   * 家電量販店の展示テレビ一斉点灯の ON / OFF。
+   *
+   * setTv / setSteam と同じく「マネージャが持つ演出スイッチ」にしておくことで、
+   * abort()（発見・クリア・リトライ・ステージ切替）からも必ず消せる。
+   * ここを onEnd だけに任せると、デモ再生中に決着したときへ戻す機会がなく、
+   * 同じステージを作り直さないリトライでは画面が点いたまま次の60秒へ持ち越される。
+   */
+  setDemoScreens(on) {
+    const screens = this.stage.eventRig && this.stage.eventRig.screens;
+    if (!screens) return;
+    this.demoScreensOn = on;
+    for (const screen of screens) {
+      const mat = screen && screen.material;
+      if (!mat || !mat.emissive) continue;
+      if (on) {
+        // 元の見た目は最初に点けたときだけ控える（消灯→再点灯で演出色を素と誤認しない）
+        if (screen.userData.demoBaseEmissive === undefined) {
+          screen.userData.demoBaseEmissive = mat.emissive.getHex();
+          screen.userData.demoBaseIntensity = mat.emissiveIntensity;
+        }
+        mat.emissive.setHex(0x224d88);
+        mat.emissiveIntensity = 1.6;
+      } else if (screen.userData.demoBaseEmissive !== undefined) {
+        // 一度も点けていない画面には触らない
+        mat.emissive.setHex(screen.userData.demoBaseEmissive);
+        mat.emissiveIntensity = screen.userData.demoBaseIntensity ?? 1;
+      }
     }
   }
 

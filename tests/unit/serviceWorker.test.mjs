@@ -54,6 +54,26 @@ test('新しい設定検証モジュールもオフライン起動時に読め�
 });
 
 
+test('three.js が分割して読み込む実体ファイルもオフラインキャッシュ対象になっている', async () => {
+  // three.module.min.js は薄い re-export で、実体は three.core.min.js 側にある。
+  // 片方だけキャッシュしてもオフラインでは import が解決できず起動しない。
+  const swSource = await readFile(swUrl, 'utf8');
+  const entryRel = 'vendor/three/three.module.min.js';
+  const source = await readFile(path.join(repoRoot, entryRel), 'utf8');
+
+  const specs = new Set(
+    [...source.matchAll(/from\s*['"](\.[^'"]+)['"]/g)].map((match) => match[1]),
+  );
+  assert.ok(specs.size > 0, 'three.module.min.js の相対importを検出できなかった');
+
+  for (const spec of specs) {
+    const rel = './' + path.posix.join(path.posix.dirname(entryRel), spec);
+    // 参照先が実在することまで確かめてから、キャッシュ対象かを見る
+    await readFile(path.join(repoRoot, rel));
+    assert.match(swSource, new RegExp(escapeRegExp(rel)), `${rel} が CORE_PATHS にない`);
+  }
+});
+
 test('起動時に到達する全JSモジュールがオフラインキャッシュ対象になっている', async () => {
   const swSource = await readFile(swUrl, 'utf8');
   const reachable = await collectReachableJs(['js/main.js', 'js/battleBgm.js']);

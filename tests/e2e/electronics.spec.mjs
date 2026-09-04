@@ -65,6 +65,31 @@ test.describe('STAGE 6 深夜の家電量販店', () => {
     expect(info.event).toBe('demo');
   });
 
+  test('展示デモ中に決着してもリトライ時には展示テレビが消えている', async ({ page }) => {
+    await unlockElectronics(page);
+    await page.click('#btnStart');
+    await page.waitForFunction(() => window.__ningenkagu.game.state === 'playing');
+
+    const readScreens = () => window.__ningenkagu.game.stage.eventRig.screens.map((screen) => ({
+      emissive: screen.material.emissive.getHex(),
+      intensity: screen.material.emissiveIntensity,
+    }));
+
+    const dark = await page.evaluate(readScreens);
+    expect(await page.evaluate(() => window.__ningenkagu.triggerStageEvent())).toBe(true);
+    const lit = await page.evaluate(readScreens);
+    expect(lit).not.toEqual(dark);
+
+    // デモ再生中に発見される＝ onEnd を通らずに stageEvent.abort() される
+    await page.evaluate(() => window.__ningenkagu.game.lose());
+    expect(await page.evaluate(readScreens)).toEqual(dark);
+
+    // 同じステージ実体を使い回すリトライでも、光ったまま持ち越さない
+    await page.click('#btnRetry');
+    await page.waitForFunction(() => window.__ningenkagu.game.state === 'playing');
+    expect(await page.evaluate(readScreens)).toEqual(dark);
+  });
+
   test('家電量販店クリアで全6ステージALL CLEARになる', async ({ page }) => {
     await unlockElectronics(page);
     await page.click('#btnStart');

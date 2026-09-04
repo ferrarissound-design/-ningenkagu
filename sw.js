@@ -1,7 +1,7 @@
 // ニンゲン家具のオフライン起動用 Service Worker。
 // 初回オンライン訪問時にゲーム本体一式を保存し、以降は通信がなくても起動できる。
 
-const CACHE_NAME = 'ningenkagu-app-v9';
+const CACHE_NAME = 'ningenkagu-app-v10';
 const CORE_PATHS = [
   './',
   './index.html',
@@ -12,6 +12,9 @@ const CORE_PATHS = [
   './assets/audio/behind_the_potted_plant.mp3',
   './assets/audio/gold_medal_morning.mp3',
   './vendor/three/three.module.min.js',
+  // three.module.min.js は本体を three.core.min.js へ分割して import する。
+  // ここに無いとオフライン初回起動でモジュール解決に失敗し、画面が真っ暗のまま止まる。
+  './vendor/three/three.core.min.js',
 
   './js/audio.js',
   './js/battleBgm.js',
