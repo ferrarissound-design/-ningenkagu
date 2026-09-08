@@ -24,7 +24,7 @@ async function collectReachableJs(entryRelPaths) {
 
     const source = await readFile(file, 'utf8');
     const specs = [];
-    const fromRe = /(?:import|export)\s+[^'"]*?\sfrom\s+['"]([^'"]+)['"]/g;
+    const fromRe = /(?:import|export)\s*[^'"]*?\s*from\s*['"]([^'"]+)['"]/g;
     const sideEffectRe = /import\s*['"]([^'"]+)['"]/g;
     for (const re of [fromRe, sideEffectRe]) {
       let match;
@@ -34,12 +34,12 @@ async function collectReachableJs(entryRelPaths) {
     for (const spec of specs) {
       if (!spec.startsWith('.')) continue;
       const resolved = path.resolve(path.dirname(file), spec);
-      if (!resolved.startsWith(path.join(repoRoot, 'js') + path.sep)) continue;
+      if (!resolved.startsWith(repoRoot + path.sep)) continue;
       if (!resolved.endsWith('.js')) continue;
       pending.push(resolved);
     }
   }
-  return [...seen].filter((file) => file.startsWith(path.join(repoRoot, 'js') + path.sep));
+  return [...seen];
 }
 
 test('オフラインキャッシュにタイトル曲と戦闘曲が含まれる', async () => {
@@ -56,10 +56,11 @@ test('新しい設定検証モジュールもオフライン起動時に読め�
 
 test('起動時に到達する全JSモジュールがオフラインキャッシュ対象になっている', async () => {
   const swSource = await readFile(swUrl, 'utf8');
-  const reachable = await collectReachableJs(['js/main.js', 'js/battleBgm.js']);
+  const reachable = await collectReachableJs(['js/main.js', 'js/battleBgm.js', 'vendor/three/three.module.min.js']);
 
   for (const file of reachable) {
     const rel = './' + path.relative(repoRoot, file).split(path.sep).join('/');
     assert.match(swSource, new RegExp(escapeRegExp(rel)), `${rel} が CORE_PATHS にない`);
   }
 });
+

@@ -16,6 +16,7 @@ import { GAME_MODE, gameModeRules, normalizeGameMode } from './gameModes.js';
 import { AnomalyManager } from './anomalies.js';
 import { OniHabitModel } from './oniAdaptation.js';
 import { challengeRules, normalizeChallengeId } from './challenges.js';
+import { objectiveProgress } from './objectives.js';
 
 export const CONFIG = {
   timeLimit: 60,
@@ -175,6 +176,7 @@ export class Game {
     this.hud.setOniPointer(null);
     this.hud.setPaused(false);
     this.hud.setDecoy(this.decoyUses);
+    this.hud.setObjective(objectiveProgress(this));
   }
 
   /**
@@ -314,9 +316,11 @@ export class Game {
     const poseHits = input.consumePose();
     if (poseHits) {
       let p = this.player.pose;
-      for (let i = 0; i < poseHits; i++) p = this.player.cyclePose();
-      if (this.challengeRules.forbidCrouch && p === 'crouch') {
-        this.failChallenge('しゃがみポーズを使った');
+      for (let i = 0; i < poseHits; i++) {
+        p = this.player.cyclePose();
+        if (this.challengeRules.forbidCrouch && p === 'crouch') {
+          this.failChallenge('しゃがみポーズを使った');
+        }
       }
       sfx.pose();
       this.hud.toast('ポーズ：' + POSE_LABEL[p]);
@@ -525,6 +529,7 @@ export class Game {
     this.hud.setWarn(this.suspicion);
     this.hud.setMimic(this.player.mimicTarget, this.isPoseMatched());
     this.hud.setPose(this.player.pose);
+    this.hud.setObjective(objectiveProgress(this));
 
     this.updateCamera(dt, false);
     this.updateOniPointer();
