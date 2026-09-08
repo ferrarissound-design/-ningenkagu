@@ -51,6 +51,10 @@ function saveBestRank(stageId, rank) {
 
 export class Hud {
   constructor() {
+    this.elObjective = $('objective');
+    this.elObjectiveName = $('objectiveName');
+    this.elObjectiveDetail = $('objectiveDetail');
+    this._lastObjective = '';
     this.elTime = $('time');
     this.elScore = $('score');
     this.elRisk = $('risk');
@@ -120,6 +124,18 @@ export class Hud {
     this.bestRank = loadBestRank(stageId);
     this.elBest.textContent = this.best.toLocaleString('en-US');
     this.elBest.parentElement.classList.remove('best');
+  }
+
+  setObjective(progress) {
+    if (!this.elObjective) return;
+    const key = progress ? `${progress.name}|${progress.state}|${progress.detail}` : '';
+    if (key === this._lastObjective) return;
+    this._lastObjective = key;
+    this.elObjective.hidden = !progress;
+    if (!progress) return;
+    this.elObjective.dataset.state = progress.state;
+    this.elObjectiveName.textContent = progress.name;
+    this.elObjectiveDetail.textContent = progress.detail;
   }
 
   setTime(sec) {
@@ -428,3 +444,4 @@ export class Hud {
     this.elPopups.innerHTML = '';
   }
 }
+
